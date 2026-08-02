@@ -58,6 +58,10 @@ app.use("/api/auth", require("./routes/authRoutes"));
 
 app.use("/api/profile", require("./routes/profileRoutes"));
 
+app.use("/api/posts", require("./routes/postRoutes"));
+
+app.use("/api/stories", require("./routes/storyRoutes"));
+
 app.use("/api/chat", require("./routes/chatRoutes"));
 
 app.use("/api/reels", require("./routes/reelRoutes"));
