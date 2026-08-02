@@ -1,4 +1,6 @@
 const Story = require("../models/Story");
+const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
 
 exports.getStories = async (req, res) => {
     try {
@@ -16,9 +18,16 @@ exports.uploadStory = async (req, res) => {
         if (!req.file) {
             return res.status(400).json({ message: "Story media is required" });
         }
+        const isVideo = req.file.mimetype.startsWith("video/");
+        const upload = await cloudinary.uploader.upload(req.file.path, {
+            resource_type: isVideo ? "video" : "image",
+            folder: "chinky/stories",
+        });
+        await fs.promises.unlink(req.file.path).catch(() => {});
+
         const story = await Story.create({
             user: req.user.id,
-            media: req.file.filename,
+            media: upload.secure_url,
             isVideo: req.file.mimetype.startsWith("video/")
         });
         res.status(201).json(story);
