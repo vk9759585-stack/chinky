@@ -1,6 +1,7 @@
 const router=require("express").Router();
 
 const auth=require("../middleware/authMiddleware");
+const upload=require("../config/multerConfig");
 
 const controller=require("../controllers/reelController");
 
@@ -9,6 +10,8 @@ router.post(
 "/",
 
 auth,
+
+upload.single("video"),
 
 controller.uploadReel
 
