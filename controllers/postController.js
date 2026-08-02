@@ -1,4 +1,6 @@
 const Post = require("../models/Post");
+const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
 
 // =========================
 // CREATE POST
@@ -12,13 +14,20 @@ exports.createPost = async (req, res) => {
             return res.status(400).json({ message: "Post media is required" });
         }
 
+        const mediaType = req.file.mimetype.startsWith("video/") ? "video" : "image";
+        const upload = await cloudinary.uploader.upload(req.file.path, {
+            resource_type: mediaType,
+            folder: `chinky/posts/${mediaType}s`,
+        });
+        await fs.promises.unlink(req.file.path).catch(() => {});
+
         const post = await Post.create({
 
             user: req.user.id,
 
-            image: req.file.filename,
+            image: upload.secure_url,
 
-            mediaType: req.file.mimetype.startsWith("video/") ? "video" : "image",
+            mediaType,
 
             caption: req.body.caption
 
