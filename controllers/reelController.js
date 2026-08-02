@@ -1,4 +1,6 @@
 const Reel=require("../models/Reel");
+const cloudinary=require("../config/cloudinary");
+const fs=require("fs");
 
 // Upload Reel
 
@@ -6,13 +8,23 @@ exports.uploadReel=async(req,res)=>{
 
     try{
 
+        if (!req.file) {
+            return res.status(400).json({ success:false, message:"Reel video is required" });
+        }
+
+        const upload=await cloudinary.uploader.upload(req.file.path,{
+            resource_type:"video",
+            folder:"chinky/reels"
+        });
+        await fs.promises.unlink(req.file.path).catch(()=>{});
+
         const reel=await Reel.create({
 
             user:req.user.id,
 
             caption:req.body.caption,
 
-            video:req.file ? req.file.filename : req.body.video,
+            video:upload.secure_url,
 
             thumbnail:req.body.thumbnail,
 
