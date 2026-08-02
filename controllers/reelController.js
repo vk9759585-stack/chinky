@@ -12,7 +12,7 @@ exports.uploadReel=async(req,res)=>{
 
             caption:req.body.caption,
 
-            video:req.body.video,
+            video:req.file ? req.file.filename : req.body.video,
 
             thumbnail:req.body.thumbnail,
 
