@@ -8,11 +8,17 @@ exports.createPost = async (req, res) => {
 
     try {
 
+        if (!req.file) {
+            return res.status(400).json({ message: "Post media is required" });
+        }
+
         const post = await Post.create({
 
             user: req.user.id,
 
             image: req.file.filename,
+
+            mediaType: req.file.mimetype.startsWith("video/") ? "video" : "image",
 
             caption: req.body.caption
 
