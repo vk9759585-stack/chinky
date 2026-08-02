@@ -56,6 +56,8 @@ require("./socket/socket")(io);
 
 app.use("/api/auth", require("./routes/authRoutes"));
 
+app.use("/api/profile", require("./routes/profileRoutes"));
+
 app.use("/api/chat", require("./routes/chatRoutes"));
 
 app.use("/api/reels", require("./routes/reelRoutes"));
