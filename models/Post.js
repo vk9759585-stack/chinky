@@ -9,6 +9,12 @@ ref:"User"
 
 image:String,
 
+mediaType:{
+type:String,
+enum:["image","video"],
+default:"image"
+},
+
 caption:String,
 
 likes:[
