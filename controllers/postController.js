@@ -15,17 +15,24 @@ exports.createPost = async (req, res) => {
         }
 
         const mediaType = req.file.mimetype.startsWith("video/") ? "video" : "image";
-        const upload = await cloudinary.uploader.upload(req.file.path, {
-            resource_type: mediaType,
-            folder: `chinky/posts/${mediaType}s`,
-        });
-        await fs.promises.unlink(req.file.path).catch(() => {});
+        let mediaUrl;
+        try {
+            const upload = await cloudinary.uploader.upload(req.file.path, {
+                resource_type: mediaType,
+                folder: `chinky/posts/${mediaType}s`,
+            });
+            mediaUrl = upload.secure_url;
+            await fs.promises.unlink(req.file.path).catch(() => {});
+        } catch (_) {
+            // Keep uploads working when Cloudinary credentials/service are unavailable.
+            mediaUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+        }
 
         const post = await Post.create({
 
             user: req.user.id,
 
-            image: upload.secure_url,
+            image: mediaUrl,
 
             mediaType,
 

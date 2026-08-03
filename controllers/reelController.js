@@ -12,11 +12,17 @@ exports.uploadReel=async(req,res)=>{
             return res.status(400).json({ success:false, message:"Reel video is required" });
         }
 
-        const upload=await cloudinary.uploader.upload(req.file.path,{
-            resource_type:"video",
-            folder:"chinky/reels"
-        });
-        await fs.promises.unlink(req.file.path).catch(()=>{});
+        let videoUrl;
+        try {
+            const upload=await cloudinary.uploader.upload(req.file.path,{
+                resource_type:"video",
+                folder:"chinky/reels"
+            });
+            videoUrl = upload.secure_url;
+            await fs.promises.unlink(req.file.path).catch(()=>{});
+        } catch (_) {
+            videoUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+        }
 
         const reel=await Reel.create({
 
@@ -24,11 +30,13 @@ exports.uploadReel=async(req,res)=>{
 
             caption:req.body.caption,
 
-            video:upload.secure_url,
+            video:videoUrl,
 
             thumbnail:req.body.thumbnail,
 
             music:req.body.music,
+
+            filter:req.body.filter,
 
             duration:req.body.duration,
 

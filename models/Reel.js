@@ -28,6 +28,11 @@ const reelSchema = new mongoose.Schema({
         default:""
     },
 
+    filter:{
+        type:String,
+        default:"Original"
+    },
+
     duration:{
         type:Number,
         default:0
