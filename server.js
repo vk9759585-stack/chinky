@@ -59,6 +59,9 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/profile", require("./routes/profileRoutes"));
 
 app.use("/api/posts", require("./routes/postRoutes"));
+app.use("/api/likes", require("./routes/likeRoutes"));
+app.use("/api/comments", require("./routes/commentRoutes"));
+app.use("/api/follow", require("./routes/followRoutes"));
 
 app.use("/api/stories", require("./routes/storyRoutes"));
 
