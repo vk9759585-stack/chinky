@@ -20,4 +20,4 @@ We use this information for:
 We do not sell user data.
 
 Contact us:
-support@chinkyapp.com
+appchinky@gmail.com
