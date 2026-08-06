@@ -1,10 +1,12 @@
 const router = require("express").Router();
 
-const auth =
-require("../middleware/authMiddleware");
+const auth = require("../middleware/authMiddleware");
 
-const controller =
-require("../controllers/referralController");
+const controller = require("../controllers/referralController");
+
+// ====================================
+// CREATE REFERRAL
+// ====================================
 
 router.post(
     "/",

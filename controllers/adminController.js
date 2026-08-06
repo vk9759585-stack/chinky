@@ -1,5 +1,5 @@
 const User = require("../models/User");
-const Post = require("../models/Post");
+const Flow = require("../models/Post");
 const Report = require("../models/Report");
 
 // ===================================
@@ -7,40 +7,40 @@ const Report = require("../models/Report");
 // ===================================
 
 exports.getUsers = async (req, res) => {
-  try {
-    const users = await User.find();
+    try {
+        const users = await User.find();
 
-    res.json({
-      success: true,
-      count: users.length,
-      data: users,
-    });
-  } catch (e) {
-    res.status(500).json({
-      success: false,
-      message: e.message,
-    });
-  }
+        res.json({
+            success: true,
+            count: users.length,
+            data: users,
+        });
+    } catch (e) {
+        res.status(500).json({
+            success: false,
+            message: e.message,
+        });
+    }
 };
 
 // ===================================
-// POSTS
+// FLOW POSTS
 // ===================================
 
-exports.getPosts = async (req, res) => {
-  try {
-    const posts = await Post.find();
+exports.getFlows = async (req, res) => {
+    try {
+        const flows = await Flow.find();
 
-    res.json({
-      success: true,
-      data: posts,
-    });
-  } catch (e) {
-    res.status(500).json({
-      success: false,
-      message: e.message,
-    });
-  }
+        res.json({
+            success: true,
+            data: flows,
+        });
+    } catch (e) {
+        res.status(500).json({
+            success: false,
+            message: e.message,
+        });
+    }
 };
 
 // ===================================
@@ -48,19 +48,19 @@ exports.getPosts = async (req, res) => {
 // ===================================
 
 exports.getReports = async (req, res) => {
-  try {
-    const reports = await Report.find();
+    try {
+        const reports = await Report.find();
 
-    res.json({
-      success: true,
-      data: reports,
-    });
-  } catch (e) {
-    res.status(500).json({
-      success: false,
-      message: e.message,
-    });
-  }
+        res.json({
+            success: true,
+            data: reports,
+        });
+    } catch (e) {
+        res.status(500).json({
+            success: false,
+            message: e.message,
+        });
+    }
 };
 
 // ===================================
@@ -68,43 +68,27 @@ exports.getReports = async (req, res) => {
 // ===================================
 
 exports.verifyUser = async (req, res) => {
-
     try {
-
         const user = await User.findByIdAndUpdate(
-
             req.params.id,
-
             {
-                verified: true
+                verified: true,
             },
-
             {
-                new: true
+                new: true,
             }
-
         );
 
         res.json({
-
             success: true,
-
-            data: user
-
+            data: user,
         });
-
     } catch (err) {
-
         res.status(500).json({
-
             success: false,
-
-            message: err.message
-
+            message: err.message,
         });
-
     }
-
 };
 
 // ===================================
@@ -112,43 +96,27 @@ exports.verifyUser = async (req, res) => {
 // ===================================
 
 exports.banUser = async (req, res) => {
-
     try {
-
         const user = await User.findByIdAndUpdate(
-
             req.params.id,
-
             {
-                banned: true
+                banned: true,
             },
-
             {
-                new: true
+                new: true,
             }
-
         );
 
         res.json({
-
             success: true,
-
-            data: user
-
+            data: user,
         });
-
     } catch (err) {
-
         res.status(500).json({
-
             success: false,
-
-            message: err.message
-
+            message: err.message,
         });
-
     }
-
 };
 
 // ===================================
@@ -156,41 +124,25 @@ exports.banUser = async (req, res) => {
 // ===================================
 
 exports.unbanUser = async (req, res) => {
-
     try {
-
         const user = await User.findByIdAndUpdate(
-
             req.params.id,
-
             {
-                banned: false
+                banned: false,
             },
-
             {
-                new: true
+                new: true,
             }
-
         );
 
         res.json({
-
             success: true,
-
-            data: user
-
+            data: user,
         });
-
     } catch (err) {
-
         res.status(500).json({
-
             success: false,
-
-            message: err.message
-
+            message: err.message,
         });
-
     }
-
 };

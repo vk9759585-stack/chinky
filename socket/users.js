@@ -1,29 +1,45 @@
-const users = new Map();
+const users = new Map(); // userId -> Set of socketIds
+const socketToUser = new Map(); // socketId -> userId
 
 function addUser(userId, socketId) {
-    users.set(userId, socketId);
+  if (!users.has(userId)) {
+    users.set(userId, new Set());
+  }
+
+  users.get(userId).add(socketId);
+  socketToUser.set(socketId, userId);
 }
 
 function removeUser(socketId) {
-    for (const [userId, id] of users.entries()) {
-        if (id === socketId) {
-            users.delete(userId);
-            break;
-        }
+  const userId = socketToUser.get(socketId);
+
+  if (!userId) return;
+
+  const sockets = users.get(userId);
+
+  if (sockets) {
+    sockets.delete(socketId);
+
+    // Agar user ke paas koi active socket nahi bacha
+    if (sockets.size === 0) {
+      users.delete(userId);
     }
+  }
+
+  socketToUser.delete(socketId);
 }
 
-function getSocket(userId) {
-    return users.get(userId);
+function getSockets(userId) {
+  return users.get(userId) || new Set();
 }
 
 function getOnlineUsers() {
-    return [...users.keys()];
+  return [...users.keys()];
 }
 
 module.exports = {
-    addUser,
-    removeUser,
-    getSocket,
-    getOnlineUsers
+  addUser,
+  removeUser,
+  getSockets,
+  getOnlineUsers,
 };

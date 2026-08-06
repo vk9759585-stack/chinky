@@ -1,33 +1,141 @@
 const router = require("express").Router();
 
 const auth = require("../middleware/authMiddleware");
-
+const upload = require("../middleware/upload");
 const controller = require("../controllers/chatController");
 
-router.post("/send", auth, controller.sendMessage);
+// ====================================
+// SEND MESSAGE
+// ====================================
 
-router.get("/:userId", auth, controller.getMessages);
+router.post(
+    "/send",
+    auth,
+    controller.sendMessage
+);
 
-router.put("/seen/:id", auth, controller.markSeen);
+// Upload attachments before sending a chat message. The response contains the
+// URL that can be passed as image, video, voice, or file to /send.
+router.post("/upload-image", auth, upload.single("image"), controller.uploadAttachment);
+router.post("/upload-video", auth, upload.single("video"), controller.uploadAttachment);
+router.post("/upload-voice", auth, upload.single("voice"), controller.uploadAttachment);
+router.post("/upload-file", auth, upload.single("file"), controller.uploadAttachment);
 
-router.put("/edit/:id", auth, controller.editMessage);
+// ====================================
+// CONVERSATIONS
+// ====================================
 
-router.put("/pin/:id", auth, controller.pinMessage);
+router.get(
+    "/conversations",
+    auth,
+    controller.getConversations
+);
 
-router.post("/reply", auth, controller.replyMessage);
+// ====================================
+// SEARCH
+// ====================================
 
-router.post("/forward/:id", auth, controller.forwardMessage);
+router.get(
+    "/search/messages",
+    auth,
+    controller.searchMessages
+);
 
-router.post("/reaction/:id", auth, controller.addReaction);
+// ====================================
+// STATISTICS
+// ====================================
 
-router.delete("/reaction/:id", auth, controller.removeReaction);
+router.get(
+    "/stats/summary",
+    auth,
+    controller.chatStats
+);
 
-router.delete("/me/:id", auth, controller.deleteForMe);
+// ====================================
+// REPLY
+// ====================================
 
-router.delete("/everyone/:id", auth, controller.deleteForEveryone);
+router.post(
+    "/reply",
+    auth,
+    controller.replyMessage
+);
 
-router.get("/search/messages", auth, controller.searchMessages);
+// ====================================
+// FORWARD MESSAGE
+// ====================================
 
-router.get("/stats/summary", auth, controller.chatStats);
+router.post(
+    "/forward/:id",
+    auth,
+    controller.forwardMessage
+);
+
+// ====================================
+// REACTIONS
+// ====================================
+
+router.post(
+    "/reaction/:id",
+    auth,
+    controller.addReaction
+);
+
+router.delete(
+    "/reaction/:id",
+    auth,
+    controller.removeReaction
+);
+
+// ====================================
+// MESSAGE STATUS
+// ====================================
+
+router.put(
+    "/seen/:id",
+    auth,
+    controller.markSeen
+);
+
+router.put(
+    "/edit/:id",
+    auth,
+    controller.editMessage
+);
+
+router.put(
+    "/pin/:id",
+    auth,
+    controller.pinMessage
+);
+
+// ====================================
+// DELETE MESSAGE
+// ====================================
+
+router.delete(
+    "/me/:id",
+    auth,
+    controller.deleteForMe
+);
+
+router.delete(
+    "/everyone/:id",
+    auth,
+    controller.deleteForEveryone
+);
+
+// Backwards-compatible endpoint used by the Flutter chat service.
+router.delete("/:id", auth, controller.deleteForMe);
+
+// ====================================
+// GET CHAT
+// ====================================
+
+router.get(
+    "/:userId",
+    auth,
+    controller.getMessages
+);
 
 module.exports = router;

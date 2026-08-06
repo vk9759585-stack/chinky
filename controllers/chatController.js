@@ -1,4 +1,46 @@
 const Chat = require("../models/Chat");
+const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
+
+// ====================================
+// UPLOAD CHAT ATTACHMENT
+// ====================================
+
+exports.uploadAttachment = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "Attachment is required"
+            });
+        }
+
+        let url = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+
+        try {
+            const uploaded = await cloudinary.uploader.upload(req.file.path, {
+                resource_type: "auto",
+                folder: "chinky/chat"
+            });
+            url = uploaded.secure_url;
+            await fs.promises.unlink(req.file.path).catch(() => {});
+        } catch (_) {
+            // Keep the local upload URL when Cloudinary is not configured.
+        }
+
+        return res.status(201).json({
+            success: true,
+            data: {
+                url,
+                name: req.file.originalname,
+                mimeType: req.file.mimetype,
+                size: req.file.size
+            }
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
 
 // ====================================
 // SEND MESSAGE
@@ -140,7 +182,10 @@ exports.getMessages = async (req, res) => {
 
             count: chats.length,
 
-            data: chats
+            data: chats.map((chat) => ({
+                ...chat.toObject(),
+                isMine: chat.sender?.toString() === req.user.id.toString()
+            }))
 
         });
 
@@ -727,4 +772,40 @@ exports.chatStats = async (req, res) => {
 
     }
 
+};
+
+// ====================================
+// RECENT CONVERSATIONS
+// ====================================
+exports.getConversations = async (req, res) => {
+    try {
+        const chats = await Chat.find({
+            $or: [{ sender: req.user.id }, { receiver: req.user.id }],
+            deletedForEveryone: false,
+            deletedFor: { $ne: req.user.id }
+        })
+            .populate("sender", "name username profileImage")
+            .populate("receiver", "name username profileImage")
+            .sort({ createdAt: -1 });
+
+        const conversations = [];
+        const seen = new Set();
+        for (const chat of chats) {
+            const senderId = chat.sender?._id?.toString() ?? chat.sender?.toString();
+            const otherUser = senderId === req.user.id.toString() ? chat.receiver : chat.sender;
+            const otherUserId = otherUser?._id?.toString() ?? otherUser?.toString();
+            if (!otherUserId || seen.has(otherUserId)) continue;
+            seen.add(otherUserId);
+            conversations.push({
+                userId: otherUserId,
+                username: otherUser?.username || otherUser?.name || "Chat",
+                profileImage: otherUser?.profileImage || "",
+                lastMessage: chat.message || "Media message",
+                createdAt: chat.createdAt
+            });
+        }
+        res.json({ success: true, data: conversations });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 };

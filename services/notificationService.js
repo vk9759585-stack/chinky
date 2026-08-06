@@ -1,29 +1,29 @@
-const admin =
-require("../config/firebase");
+const admin = require("../config/firebase");
 
-exports.sendNotification =
-async (
+// Send push notification via Firebase
+exports.sendNotification = async (token, title, body, data = {}) => {
+  try {
+    // Basic validation
+    if (!token) throw new Error("FCM token is required");
+    if (!title) throw new Error("Notification title is required");
+    if (!body) throw new Error("Notification body is required");
 
-token,
+    const message = {
+      token,
+      notification: {
+        title,
+        body,
+      },
+      data, // optional custom data payload (must be string values)
+    };
 
-title,
+    const response = await admin.messaging().send(message);
 
-body
+    console.log("Notification sent successfully:", response);
+    return response;
 
-)=>{
-
-    await admin.messaging().send({
-
-        token,
-
-        notification:{
-
-            title,
-
-            body
-
-        }
-
-    });
-
+  } catch (error) {
+    console.error("Error sending notification:", error.message);
+    throw new Error("Failed to send notification");
+  }
 };

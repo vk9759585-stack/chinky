@@ -1,21 +1,20 @@
-const router = require("express").Router();
+const express = require("express");
+const router = express.Router();
 
-const auth =
-require("../middleware/authMiddleware");
+// Middleware
+const authMiddleware = require("../middleware/authMiddleware");
 
-const controller =
-require("../controllers/subscriptionController");
+// Controller
+const subscriptionController = require("../controllers/subscriptionController");
 
-router.post(
-    "/",
-    auth,
-    controller.createSubscription
-);
+// ====================================
+// SUBSCRIPTION ROUTES
+// ====================================
 
-router.get(
-    "/",
-    auth,
-    controller.getSubscription
-);
+// POST /subscriptions -> Create a subscription
+router.post("/", authMiddleware, subscriptionController.createSubscription);
+
+// GET /subscriptions -> Get user subscription details
+router.get("/", authMiddleware, subscriptionController.getSubscription);
 
 module.exports = router;

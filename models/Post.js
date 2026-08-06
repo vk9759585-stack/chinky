@@ -1,43 +1,92 @@
-const mongoose=require("mongoose");
+const mongoose = require("mongoose");
 
-const postSchema=new mongoose.Schema({
+const postSchema = new mongoose.Schema(
+    {
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true
+        },
 
-user:{
-type:mongoose.Schema.Types.ObjectId,
-ref:"User"
-},
+        image: {
+            type: String,
+            default: ""
+        },
 
-image:String,
+        mediaType: {
+            type: String,
+            enum: ["image", "video"],
+            default: "image"
+        },
 
-mediaType:{
-type:String,
-enum:["image","video"],
-default:"image"
-},
+        caption: {
+            type: String,
+            default: ""
+        },
 
-caption:String,
+        location: {
+            type: String,
+            default: ""
+        },
 
-likes:[
-{
-type:mongoose.Schema.Types.ObjectId,
-ref:"User"
-}
-],
+        hashtags: [
+            {
+                type: String
+            }
+        ],
 
-comments:[
-{
-type:mongoose.Schema.Types.ObjectId,
-ref:"Comment"
-}
-],
+        likes: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "User"
+            }
+        ],
 
-shares:{
-type:Number,
-default:0
-}
+        comments: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "Comment"
+            }
+        ],
 
-},{
-timestamps:true
+        saves: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "User"
+            }
+        ],
+
+        views: {
+            type: Number,
+            default: 0
+        },
+
+        shares: {
+            type: Number,
+            default: 0
+        },
+
+        isEdited: {
+            type: Boolean,
+            default: false
+        },
+
+        isArchived: {
+            type: Boolean,
+            default: false
+        }
+    },
+    {
+        timestamps: true
+    }
+);
+
+postSchema.index({
+    user: 1,
+    createdAt: -1
 });
 
-module.exports=mongoose.model("Post",postSchema);
+module.exports = mongoose.model(
+    "Post",
+    postSchema
+);

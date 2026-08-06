@@ -1,11 +1,26 @@
 const router = require("express").Router();
 
 const auth = require("../middleware/authMiddleware");
-
 const controller = require("../controllers/followController");
 
-router.post("/:id", auth, controller.followUser);
+// ====================================
+// FOLLOW USER
+// ====================================
 
-router.delete("/:id", auth, controller.unfollowUser);
+router.post(
+    "/:id",
+    auth,
+    controller.followUser
+);
+
+// ====================================
+// UNFOLLOW USER
+// ====================================
+
+router.delete(
+    "/:id",
+    auth,
+    controller.unfollowUser
+);
 
 module.exports = router;

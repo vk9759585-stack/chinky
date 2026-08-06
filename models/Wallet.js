@@ -1,25 +1,39 @@
 const mongoose = require("mongoose");
 
 const walletSchema = new mongoose.Schema(
-{
-    user: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
-    },
+    {
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+            unique: true
+        },
 
-    balance: {
-        type: Number,
-        default: 0
-    },
+        balance: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
 
-    coins: {
-        type: Number,
-        default: 0
+        coins: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+
+        totalEarned: {
+            type: Number,
+            default: 0
+        },
+
+        totalSpent: {
+            type: Number,
+            default: 0
+        }
+    },
+    {
+        timestamps: true
     }
-},
-{
-    timestamps: true
-}
 );
 
 module.exports = mongoose.model(

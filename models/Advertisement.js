@@ -1,31 +1,56 @@
 const mongoose = require("mongoose");
 
 const advertisementSchema = new mongoose.Schema(
-{
-    title: String,
+    {
+        title: {
+            type: String,
+            required: true,
+            trim: true
+        },
 
-    image: String,
+        description: {
+            type: String,
+            default: ""
+        },
 
-    link: String,
+        image: {
+            type: String,
+            required: true
+        },
 
-    clicks: {
-        type: Number,
-        default: 0
+        link: {
+            type: String,
+            default: ""
+        },
+
+        advertiser: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        },
+
+        clicks: {
+            type: Number,
+            default: 0
+        },
+
+        impressions: {
+            type: Number,
+            default: 0
+        },
+
+        budget: {
+            type: Number,
+            default: 0
+        },
+
+        active: {
+            type: Boolean,
+            default: true
+        }
     },
-
-    impressions: {
-        type: Number,
-        default: 0
-    },
-
-    active: {
-        type: Boolean,
-        default: true
+    {
+        timestamps: true
     }
-},
-{
-    timestamps: true
-}
 );
 
 module.exports = mongoose.model(

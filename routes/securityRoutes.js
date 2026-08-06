@@ -1,15 +1,17 @@
-const router = require("express").Router();
+const express = require("express");
+const router = express.Router();
 
-const auth =
-  require("../middleware/authMiddleware");
+// Middleware
+const authMiddleware = require("../middleware/authMiddleware");
 
-const controller =
-  require("../controllers/securityController");
+// Controller
+const securityController = require("../controllers/securityController");
 
-router.get(
-  "/history",
-  auth,
-  controller.getLoginHistory,
-);
+// ====================================
+// SECURITY ROUTES
+// ====================================
+
+// GET /security/history
+router.get("/history", authMiddleware, securityController.getLoginHistory);
 
 module.exports = router;

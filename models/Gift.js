@@ -1,30 +1,63 @@
 const mongoose = require("mongoose");
 
 const giftSchema = new mongoose.Schema(
-{
-    sender: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
-    },
+    {
+        sender: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true
+        },
 
-    receiver: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
-    },
+        receiver: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true
+        },
 
-    giftName: {
-        type: String
-    },
+        giftName: {
+            type: String,
+            required: true,
+            trim: true
+        },
 
-    coins: {
-        type: Number,
-        default: 0
+        giftImage: {
+            type: String,
+            default: ""
+        },
+
+        coins: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+
+        message: {
+            type: String,
+            default: ""
+        },
+
+        status: {
+            type: String,
+            enum: [
+                "pending",
+                "completed",
+                "failed"
+            ],
+            default: "completed"
+        }
+    },
+    {
+        timestamps: true
     }
-},
-{
-    timestamps: true
-}
 );
+
+giftSchema.index({
+    sender: 1
+});
+
+giftSchema.index({
+    receiver: 1
+});
 
 module.exports = mongoose.model(
     "Gift",

@@ -1,38 +1,37 @@
-const razorpay =
-require("../config/razorpay");
+const razorpay = require("../config/razorpay");
 
-exports.createOrder =
-async(req,res)=>{
+// ======================================
+// CREATE ORDER
+// ======================================
 
-    try{
+exports.createOrder = async (req, res) => {
+    try {
+        const amount = Number(req.body.amount);
 
-        const order =
-        await razorpay.orders.create({
+        if (!amount || amount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid amount"
+            });
+        }
 
-            amount:req.body.amount*100,
+        const options = {
+            amount: amount * 100,
+            currency: "INR",
+            receipt: `receipt_${Date.now()}`
+        };
 
-            currency:"INR"
+        const order = await razorpay.orders.create(options);
 
-        });
-
-        res.json({
-
-            success:true,
-
+        return res.status(200).json({
+            success: true,
             order
-
         });
 
-    }catch(err){
-
-        res.status(500).json({
-
-            success:false,
-
-            message:err.message
-
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
         });
-
     }
-
 };

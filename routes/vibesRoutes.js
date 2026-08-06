@@ -4,19 +4,21 @@ const auth = require("../middleware/authMiddleware");
 
 const upload = require("../config/multerConfig");
 
-const controller = require("../controllers/storyController");
+const controller = require("../controllers/vibesController");
 
 router.get(
     "/",
     auth,
-    controller.getStories
+controller.getVibes
 );
 
 router.post(
     "/upload",
     auth,
     upload.single("story"),
-    controller.uploadStory
+    controller.createVibes
 );
+
+router.delete('/:id', auth, controller.deleteVibes);
 
 module.exports = router;

@@ -1,60 +1,78 @@
 const mongoose = require("mongoose");
 
 const notificationSchema = new mongoose.Schema(
-{
-    sender:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"User"
-    },
+    {
+        sender: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            default: null
+        },
 
-    receiver:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"User",
-        required:true
-    },
+        receiver: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true
+        },
 
-    type:{
-        type:String,
-        enum:[
-            "like",
-            "comment",
-            "follow",
-            "message",
-            "call",
-            "live",
-            "mention",
-            "reel_like",
-            "story_like"
-        ]
-    },
+        type: {
+            type: String,
+            enum: [
+                "like",
+                "comment",
+                "follow",
+                "message",
+                "call",
+                "live",
+                "mention",
+                "spark_like",
+                "vibes_like",
+                "club_invite",
+                "verification"
+            ],
+            required: true
+        },
 
-    title:{
-        type:String,
-        default:""
-    },
+        title: {
+            type: String,
+            default: ""
+        },
 
-    body:{
-        type:String,
-        default:""
-    },
+        body: {
+            type: String,
+            default: ""
+        },
 
-    image:{
-        type:String,
-        default:""
-    },
+        image: {
+            type: String,
+            default: ""
+        },
 
-    isRead:{
-        type:Boolean,
-        default:false
+        link: {
+            type: String,
+            default: ""
+        },
+
+        isRead: {
+            type: Boolean,
+            default: false
+        },
+
+        readAt: {
+            type: Date,
+            default: null
+        }
+    },
+    {
+        timestamps: true
     }
+);
 
-},
-{
-    timestamps:true
+notificationSchema.index({
+    receiver: 1,
+    createdAt: -1
 });
 
-module.exports =
-mongoose.model(
-"Notification",
-notificationSchema
+module.exports = mongoose.model(
+    "Notification",
+    notificationSchema
 );

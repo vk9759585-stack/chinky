@@ -1,16 +1,31 @@
 const jwt = require("jsonwebtoken");
 
-module.exports = (req, res, next) => {
+// ======================================
+// AUTH MIDDLEWARE
+// ======================================
 
-    const token = req.headers.authorization?.split(" ")[1];
-
-    if (!token) {
-        return res.status(401).json({
-            message: "Unauthorized"
-        });
-    }
-
+module.exports = async (req, res, next) => {
     try {
+        const authHeader = req.headers.authorization;
+
+        if (
+            !authHeader ||
+            !authHeader.startsWith("Bearer ")
+        ) {
+            return res.status(401).json({
+                success: false,
+                message: "Access denied"
+            });
+        }
+
+        const token = authHeader.split(" ")[1];
+
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: "Token not found"
+            });
+        }
 
         const decoded = jwt.verify(
             token,
@@ -24,9 +39,8 @@ module.exports = (req, res, next) => {
     } catch (err) {
 
         return res.status(401).json({
-            message: "Invalid Token"
+            success: false,
+            message: "Invalid or expired token"
         });
-
     }
-
 };

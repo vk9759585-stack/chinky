@@ -1,40 +1,53 @@
-const LoginHistory =
-  require("../models/LoginHistory");
+const LoginHistory = require("../models/LoginHistory");
 
-exports.getLoginHistory =
-  async (req, res) => {
+// ======================================
+// GET LOGIN HISTORY
+// ======================================
 
+exports.getLoginHistory = async (req, res) => {
     try {
-
-      const history =
-        await LoginHistory.find({
-
-          user: req.user.id,
-
+        const history = await LoginHistory.find({
+            user: req.user.id
         }).sort({
-
-          createdAt: -1,
-
+            createdAt: -1
         });
 
-      res.json({
-
-        success: true,
-
-        data: history,
-
-      });
+        return res.status(200).json({
+            success: true,
+            count: history.length,
+            data: history
+        });
 
     } catch (err) {
 
-      res.status(500).json({
-
-        success: false,
-
-        message: err.message,
-
-      });
-
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
     }
+};
 
-  };
+// ======================================
+// DELETE LOGIN HISTORY
+// ======================================
+
+exports.deleteLoginHistory = async (req, res) => {
+    try {
+
+        await LoginHistory.deleteMany({
+            user: req.user.id
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Login history deleted successfully"
+        });
+
+    } catch (err) {
+
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};

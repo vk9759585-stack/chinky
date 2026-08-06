@@ -1,42 +1,71 @@
 const mongoose = require("mongoose");
 
 const otpSchema = new mongoose.Schema(
-{
-    user:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"User"
-    },
+    {
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            default: null
+        },
 
-    email:{
-        type:String,
-        required:true
-    },
+        email: {
+            type: String,
+            trim: true,
+            lowercase: true,
+            default: ""
+        },
 
-    otp:{
-        type:String,
-        required:true
-    },
+        phone: {
+            type: String,
+            required: true,
+            trim: true
+        },
 
-    purpose:{
-        type:String,
-        enum:[
-            "register",
-            "login",
-            "forgot_password",
-            "change_email"
-        ],
-        default:"login"
-    },
+        otp: {
+            type: String,
+            required: true
+        },
 
-    expiresAt:{
-        type:Date,
-        required:true
+        purpose: {
+            type: String,
+            enum: [
+                "register",
+                "login",
+                "forgot_password",
+                "change_email",
+                "change_phone",
+                "verification"
+            ],
+            default: "login"
+        },
+
+        attempts: {
+            type: Number,
+            default: 0
+        },
+
+        verified: {
+            type: Boolean,
+            default: false
+        },
+
+        expiresAt: {
+            type: Date,
+            required: true
+        }
+    },
+    {
+        timestamps: true
     }
+);
 
-},
-{
-    timestamps:true
-}
+otpSchema.index(
+    {
+        expiresAt: 1
+    },
+    {
+        expireAfterSeconds: 0
+    }
 );
 
 module.exports = mongoose.model(

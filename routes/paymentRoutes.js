@@ -1,14 +1,19 @@
-const router=require("express").Router();
+const router = require("express").Router();
 
-const auth=require("../middleware/authMiddleware");
+const auth = require("../middleware/authMiddleware");
 
-const controller=
-require("../controllers/paymentController");
-
-router.post(
-"/order",
-auth,
-controller.createOrder
+const controller = require(
+    "../controllers/paymentController"
 );
 
-module.exports=router;
+// ====================================
+// CREATE PAYMENT ORDER
+// ====================================
+
+router.post(
+    "/order",
+    auth,
+    controller.createOrder
+);
+
+module.exports = router;

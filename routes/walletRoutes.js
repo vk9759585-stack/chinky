@@ -1,21 +1,20 @@
-const router = require("express").Router();
+const express = require("express");
+const router = express.Router();
 
-const auth =
-require("../middleware/authMiddleware");
+// Middleware
+const authMiddleware = require("../middleware/authMiddleware");
 
-const controller =
-require("../controllers/walletController");
+// Controller
+const walletController = require("../controllers/walletController");
 
-router.get(
-    "/",
-    auth,
-    controller.getWallet
-);
+// ====================================
+// WALLET ROUTES
+// ====================================
 
-router.put(
-    "/coins",
-    auth,
-    controller.addCoins
-);
+// GET /wallet -> Get user wallet details
+router.get("/", authMiddleware, walletController.getWallet);
+
+// PUT /wallet/coins -> Add coins to wallet
+router.put("/coins", authMiddleware, walletController.addCoins);
 
 module.exports = router;

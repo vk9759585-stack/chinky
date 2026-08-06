@@ -1,47 +1,39 @@
 const router = require("express").Router();
 
 const auth = require("../middleware/authMiddleware");
-
-const upload = require("../config/multerConfig");
+const upload = require("../middleware/upload");
 
 const controller = require("../controllers/postController");
 
-// Feed
+// ====================================
+// GET FLOW
+// ====================================
 
 router.get(
-
     "/",
-
     auth,
-
-    controller.getFeed
-
+    controller.getFlow
 );
 
-// Create Post
+// ====================================
+// CREATE POST
+// ====================================
 
 router.post(
-
     "/",
-
     auth,
-
     upload.single("image"),
-
     controller.createPost
-
 );
 
-// Delete
+// ====================================
+// DELETE POST
+// ====================================
 
 router.delete(
-
     "/:id",
-
     auth,
-
     controller.deletePost
-
 );
 
 module.exports = router;
