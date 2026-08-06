@@ -14,6 +14,12 @@ const commentSchema = new mongoose.Schema(
             required: true
         },
 
+        parentComment: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Comment",
+            default: null
+        },
+
         comment: {
             type: String,
             required: true,
@@ -45,6 +51,11 @@ const commentSchema = new mongoose.Schema(
 commentSchema.index({
     post: 1,
     createdAt: -1
+});
+
+commentSchema.index({
+    parentComment: 1,
+    createdAt: 1
 });
 
 module.exports = mongoose.model(

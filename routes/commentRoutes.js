@@ -8,6 +8,12 @@ const controller = require("../controllers/commentController");
 // ====================================
 
 router.post(
+    "/:id/:commentId/replies",
+    auth,
+    controller.addReply
+);
+
+router.post(
     "/:id",
     auth,
     controller.addComment

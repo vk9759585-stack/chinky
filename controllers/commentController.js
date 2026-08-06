@@ -39,6 +39,15 @@ exports.addComment = async (req, res) => {
 
     try {
 
+        const text = req.body.comment?.trim();
+
+        if (!text) {
+            return res.status(400).json({
+                success: false,
+                message: "Comment cannot be empty"
+            });
+        }
+
         const post = await Post.findById(req.params.id);
 
         if (!post) {
@@ -56,7 +65,7 @@ exports.addComment = async (req, res) => {
 
             post: req.params.id,
 
-            comment: req.body.comment
+            comment: text
 
         });
 
@@ -169,5 +178,41 @@ exports.editComment = async (req, res) => {
             message: err.message
         });
 
+    }
+};
+
+// =====================================
+// ADD COMMENT REPLY
+// =====================================
+
+exports.addReply = async (req, res) => {
+    try {
+        const text = req.body.comment?.trim();
+        if (!text) {
+            return res.status(400).json({ success: false, message: "Reply cannot be empty" });
+        }
+
+        const [post, parentComment] = await Promise.all([
+            Post.findById(req.params.id),
+            Comment.findOne({ _id: req.params.commentId, post: req.params.id })
+        ]);
+
+        if (!post || !parentComment) {
+            return res.status(404).json({ success: false, message: "Post or comment not found" });
+        }
+
+        const reply = await Comment.create({
+            user: req.user.id,
+            post: req.params.id,
+            parentComment: parentComment._id,
+            comment: text
+        });
+
+        const result = await Comment.findById(reply._id)
+            .populate("user", "username profileImage");
+
+        return res.status(201).json({ success: true, data: result });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
