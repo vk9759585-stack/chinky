@@ -20,6 +20,14 @@ const giftSchema = new mongoose.Schema(
             trim: true
         },
 
+        sourceType: { type: String, enum: ['live', 'spark'], required: true, default: 'spark' },
+
+        sourceId: { type: String, required: true, default: '' },
+
+        creatorShareCoins: { type: Number, default: 0, min: 0 },
+
+        platformShareCoins: { type: Number, default: 0, min: 0 },
+
         giftImage: {
             type: String,
             default: ""
@@ -58,6 +66,8 @@ giftSchema.index({
 giftSchema.index({
     receiver: 1
 });
+
+giftSchema.index({ sourceType: 1, sourceId: 1, createdAt: -1 });
 
 module.exports = mongoose.model(
     "Gift",

@@ -13,6 +13,11 @@ const postSchema = new mongoose.Schema(
             default: ""
         },
 
+        thumbnail: {
+            type: String,
+            default: ""
+        },
+
         mediaType: {
             type: String,
             enum: ["image", "video"],
@@ -28,6 +33,10 @@ const postSchema = new mongoose.Schema(
             type: String,
             default: ""
         },
+
+        taggedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+
+        products: [{ type: String }],
 
         hashtags: [
             {
@@ -61,6 +70,11 @@ const postSchema = new mongoose.Schema(
             default: 0
         },
 
+        viewedBy: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        }],
+
         shares: {
             type: Number,
             default: 0
@@ -83,6 +97,15 @@ const postSchema = new mongoose.Schema(
 
 postSchema.index({
     user: 1,
+    createdAt: -1
+});
+
+postSchema.index({
+    taggedUsers: 1,
+    createdAt: -1
+});
+
+postSchema.index({
     createdAt: -1
 });
 

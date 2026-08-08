@@ -6,31 +6,34 @@ const Vibes = require("../models/Vibes");
 
 exports.vibesSeen = async (req, res) => {
     try {
-        const vibe = await Vibes.findById(req.params.id);
+        const userId = req.user.id;
+        const counted = await Vibes.findOneAndUpdate(
+            { _id: req.params.id, views: { $ne: userId } },
+            { $addToSet: { views: userId } },
+            { new: true }
+        ).select("views");
 
-        if (!vibe) {
+        if (counted) {
+            return res.json({
+                success: true,
+                totalViews: counted.views.length,
+                counted: true
+            });
+        }
+
+        const existing = await Vibes.findById(req.params.id).select("views");
+        if (!existing) {
             return res.status(404).json({
                 success: false,
                 message: "Vibes not found"
             });
         }
 
-        const userId = req.user.id;
-
-        const alreadySeen = vibe.views.some(
-            (view) => view.toString() === userId
-        );
-
-        if (!alreadySeen) {
-            vibe.views.push(userId);
-            await vibe.save();
-        }
-
         return res.json({
             success: true,
-            totalViews: vibe.views.length
+            totalViews: existing.views.length,
+            counted: false
         });
-
     } catch (err) {
         return res.status(500).json({
             success: false,

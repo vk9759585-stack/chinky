@@ -30,6 +30,25 @@ const storySchema = new mongoose.Schema(
             default: ""
         },
 
+        likes: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "User"
+            }
+        ],
+
+        comments: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "VibesComment"
+            }
+        ],
+
+        shares: {
+            type: Number,
+            default: 0
+        },
+
         expiresAt: {
             type: Date,
             default: () => new Date(Date.now() + 24 * 60 * 60 * 1000)
@@ -39,6 +58,9 @@ const storySchema = new mongoose.Schema(
         timestamps: true
     }
 );
+
+storySchema.index({ user: 1, createdAt: -1 });
+storySchema.index({ expiresAt: 1, createdAt: -1 });
 
 module.exports = mongoose.model(
     "Story",

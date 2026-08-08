@@ -18,6 +18,11 @@ const reportSchema = new mongoose.Schema(
         ref: "Post",
     },
 
+    targetSpark: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Spark",
+    },
+
     reason: {
         type: String,
         required: true,

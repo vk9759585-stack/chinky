@@ -22,6 +22,14 @@ router.get(
     controller.getMyContent
 );
 
+router.get(
+    "/saved-posts",
+    auth,
+    controller.getSavedPosts
+);
+
+router.get("/user/:id", auth, controller.getPublicProfile);
+
 // ====================================
 // PROFILE PHOTO
 // ====================================

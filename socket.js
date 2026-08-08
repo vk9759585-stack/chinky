@@ -1,4 +1,4 @@
-const Chat = require("../models/Chat");
+const Chat = require("./models/Chat");
 
 module.exports = (io) => {
 

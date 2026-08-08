@@ -29,4 +29,16 @@ router.get(
     controller.getComments
 );
 
+router.put(
+    "/:id/:commentId",
+    auth,
+    controller.editComment
+);
+
+router.delete(
+    "/:id/:commentId",
+    auth,
+    controller.deleteComment
+);
+
 module.exports = router;

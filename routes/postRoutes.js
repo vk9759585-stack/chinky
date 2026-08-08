@@ -26,6 +26,26 @@ router.post(
     controller.createPost
 );
 
+router.put("/:id", auth, controller.updatePost);
+
+router.post(
+    "/:id/save",
+    auth,
+    controller.toggleSavePost
+);
+
+router.post(
+    "/:id/share",
+    auth,
+    controller.recordShare
+);
+
+router.put(
+    "/:id/view",
+    auth,
+    controller.addView
+);
+
 // ====================================
 // DELETE POST
 // ====================================

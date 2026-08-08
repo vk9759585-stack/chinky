@@ -65,7 +65,13 @@ const paymentSchema = new mongoose.Schema(
         description: {
             type: String,
             default: ""
-        }
+        },
+
+        packageId: { type: String, default: "" },
+
+        coins: { type: Number, default: 0, min: 0 },
+
+        processedAt: { type: Date, default: null }
     },
     {
         timestamps: true
@@ -76,6 +82,9 @@ paymentSchema.index({
     user: 1,
     createdAt: -1
 });
+
+paymentSchema.index({ orderId: 1 });
+paymentSchema.index({ paymentId: 1 });
 
 module.exports = mongoose.model(
     "Payment",

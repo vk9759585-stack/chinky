@@ -35,4 +35,10 @@ router.put("/view/:id", authMiddleware, sparkController.addView);
 // PUT /sparks/share/:id -> Share a spark
 router.put("/share/:id", authMiddleware, sparkController.shareSpark);
 
+router.delete("/:id", authMiddleware, sparkController.deleteSpark);
+
+router.post("/report/:id", authMiddleware, sparkController.reportSpark);
+
+router.post("/:id/gifts", authMiddleware, sparkController.sendGift);
+
 module.exports = router;

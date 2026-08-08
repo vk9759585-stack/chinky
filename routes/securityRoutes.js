@@ -13,5 +13,6 @@ const securityController = require("../controllers/securityController");
 
 // GET /security/history
 router.get("/history", authMiddleware, securityController.getLoginHistory);
+router.post("/change-password", authMiddleware, securityController.changePassword);
 
 module.exports = router;

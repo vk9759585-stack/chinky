@@ -32,7 +32,24 @@ module.exports = async (req, res, next) => {
             process.env.JWT_SECRET
         );
 
-        req.user = decoded;
+        const userId =
+            decoded?.id ||
+            decoded?._id ||
+            decoded?.userId;
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "User id missing from token"
+            });
+        }
+
+        req.user = {
+            ...decoded,
+            id: userId.toString(),
+            _id: userId.toString(),
+            userId: userId.toString(),
+        };
 
         next();
 

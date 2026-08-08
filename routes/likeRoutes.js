@@ -7,6 +7,8 @@ const controller = require("../controllers/likeController");
 // LIKE / UNLIKE POST
 // ====================================
 
+router.get("/:id", auth, controller.getPostLikes);
+
 router.post(
     "/:id",
     auth,

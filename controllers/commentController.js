@@ -7,27 +7,22 @@ const Post = require("../models/Post");
 
 exports.getComments = async (req, res) => {
     try {
-        const comments = await Comment.find({
-            post: req.params.id
-        })
-            .populate("user", "username profileImage")
-            .sort({
-                createdAt: -1
-            });
-
-        return res.status(200).json({
-            success: true,
-            count: comments.length,
-            data: comments
-        });
-
+        const page = Math.max(Number(req.query.page) || 1, 1);
+        const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+        const skip = (page - 1) * limit;
+        const filter = { post: req.params.id };
+        const [comments, total] = await Promise.all([
+            Comment.find(filter)
+                .populate("user", "name username profileImage verified")
+                .populate("parentComment")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Comment.countDocuments(filter)
+        ]);
+        return res.status(200).json({ success: true, page, count: comments.length, total, hasMore: skip + comments.length < total, data: comments });
     } catch (err) {
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
-
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
 
@@ -125,7 +120,11 @@ exports.deleteComment = async (req, res) => {
 
         }
 
-        await Comment.findByIdAndDelete(req.params.commentId);
+        await Promise.all([
+            Comment.findByIdAndDelete(req.params.commentId),
+            Comment.deleteMany({ parentComment: req.params.commentId }),
+            Post.findByIdAndUpdate(comment.post, { $pull: { comments: req.params.commentId } })
+        ]);
 
         return res.status(200).json({
             success: true,
@@ -161,7 +160,22 @@ exports.editComment = async (req, res) => {
 
         }
 
-        comment.comment = req.body.comment;
+        if (comment.user.toString() !== req.user.id.toString()) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized"
+            });
+        }
+
+        const text = req.body.comment?.trim();
+        if (!text) {
+            return res.status(400).json({
+                success: false,
+                message: "Comment cannot be empty"
+            });
+        }
+
+        comment.comment = text;
         comment.edited = true;
 
         await comment.save();

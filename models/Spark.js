@@ -18,6 +18,11 @@ const reelSchema = new mongoose.Schema(
             required: true
         },
 
+        videoPublicId: {
+            type: String,
+            default: ""
+        },
+
         thumbnail: {
             type: String,
             default: ""
@@ -38,6 +43,15 @@ const reelSchema = new mongoose.Schema(
             default: 0
         },
 
+        location: {
+            type: String,
+            default: ""
+        },
+
+        taggedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+
+        products: [{ type: String }],
+
         hashtags: [String],
 
         likes: [
@@ -50,7 +64,7 @@ const reelSchema = new mongoose.Schema(
         comments: [
             {
                 type: mongoose.Schema.Types.ObjectId,
-                ref: "Comment"
+                ref: "SparkComment"
             }
         ],
 
@@ -63,6 +77,11 @@ const reelSchema = new mongoose.Schema(
             type: Number,
             default: 0
         },
+
+        viewedBy: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        }],
 
         saves: [
             {
@@ -80,6 +99,10 @@ const reelSchema = new mongoose.Schema(
         timestamps: true
     }
 );
+
+reelSchema.index({ user: 1, createdAt: -1 });
+reelSchema.index({ taggedUsers: 1, createdAt: -1 });
+reelSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model(
     "Spark",

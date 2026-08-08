@@ -16,6 +16,7 @@ module.exports = (io) => {
       try {
         if (!userId) return;
 
+        socket.join(`user:${userId}`);
         addUser(userId, socket.id);
 
         io.emit("onlineUsers", getOnlineUsers());
@@ -31,11 +32,7 @@ module.exports = (io) => {
       try {
         if (!senderId || !receiverId) return;
 
-        const receiverSocket = getSocket(receiverId);
-
-        if (receiverSocket) {
-          io.to(receiverSocket).emit("typing", { senderId });
-        }
+        io.to(`user:${receiverId}`).emit("typing", { senderId });
       } catch (error) {
         console.error("Typing Error:", error.message);
       }
@@ -48,11 +45,7 @@ module.exports = (io) => {
       try {
         if (!senderId || !receiverId) return;
 
-        const receiverSocket = getSocket(receiverId);
-
-        if (receiverSocket) {
-          io.to(receiverSocket).emit("stopTyping", { senderId });
-        }
+        io.to(`user:${receiverId}`).emit("stopTyping", { senderId });
       } catch (error) {
         console.error("StopTyping Error:", error.message);
       }

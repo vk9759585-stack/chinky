@@ -1,19 +1,25 @@
 const Razorpay = require("razorpay");
 
-// Validate environment variables
-if (!process.env.RAZORPAY_KEY || !process.env.RAZORPAY_SECRET) {
-  throw new Error("Razorpay environment variables are missing");
+const keyId = process.env.RAZORPAY_KEY?.trim();
+const keySecret = process.env.RAZORPAY_SECRET?.trim();
+
+if (!keyId || !keySecret) {
+  if (process.env.NODE_ENV !== "production") {
+    console.warn("Razorpay disabled: set RAZORPAY_KEY and RAZORPAY_SECRET to enable payments.");
+  }
+  module.exports = null;
+  return;
 }
 
 // Create instance
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY,
-  key_secret: process.env.RAZORPAY_SECRET,
+  key_id: keyId,
+  key_secret: keySecret,
 });
 
 // Optional: Log in development
 if (process.env.NODE_ENV !== "production") {
-  console.log("✅ Razorpay initialized");
+  console.log("Razorpay initialized");
 }
 
 module.exports = razorpay;

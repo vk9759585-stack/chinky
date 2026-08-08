@@ -5,6 +5,9 @@ const isAdmin = require("../middleware/isAdmin");
 
 const controller = require("../controllers/adminController");
 
+router.get('/monetization/overview', auth, isAdmin, controller.getMonetizationOverview);
+router.get('/monetization/ledger', auth, isAdmin, controller.getWalletLedger);
+
 // ===================================
 // USERS
 // ===================================

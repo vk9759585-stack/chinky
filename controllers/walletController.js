@@ -1,4 +1,6 @@
 const Wallet = require("../models/Wallet");
+const { COIN_PACKAGES } = require('../config/monetization');
+const { getOrCreateWallet } = require('../services/walletAccountingService');
 
 // ======================================
 // GET WALLET
@@ -6,17 +8,7 @@ const Wallet = require("../models/Wallet");
 
 exports.getWallet = async (req, res) => {
     try {
-        let wallet = await Wallet.findOne({
-            user: req.user.id
-        });
-
-        if (!wallet) {
-            wallet = await Wallet.create({
-                user: req.user.id,
-                coins: 0,
-                balance: 0
-            });
-        }
+        const wallet = await getOrCreateWallet(req.user.id);
 
         return res.json({
             success: true,
@@ -36,46 +28,10 @@ exports.getWallet = async (req, res) => {
 // ADD COINS
 // ======================================
 
-exports.addCoins = async (req, res) => {
-    try {
-        const coins = Number(req.body.coins);
-
-        if (!coins || coins <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid coin amount"
-            });
-        }
-
-        let wallet = await Wallet.findOne({
-            user: req.user.id
-        });
-
-        if (!wallet) {
-            wallet = await Wallet.create({
-                user: req.user.id,
-                coins: 0,
-                balance: 0
-            });
-        }
-
-        wallet.coins += coins;
-
-        await wallet.save();
-
-        return res.json({
-            success: true,
-            data: wallet
-        });
-
-    } catch (err) {
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
-    }
-};
+exports.addCoins = async (_, res) => res.status(405).json({
+    success: false,
+    message: 'Direct coin credits are disabled. Create and verify a payment order instead.',
+});
 
 // ======================================
 // REMOVE COINS
@@ -120,3 +76,8 @@ exports.removeCoins = async (req, res) => {
         });
     }
 };
+
+exports.getCoinPackages = (_, res) => res.json({
+    success: true,
+    data: COIN_PACKAGES.map(({ id, amountPaise, coins }) => ({ id, amountPaise, coins })),
+});

@@ -11,6 +11,9 @@ const sparkCommentController = require("../controllers/sparkCommentController");
 // SPARK COMMENT ROUTES
 // ====================================
 
+// POST /spark-comments/:id/:commentId/replies -> Reply
+router.post("/:id/:commentId/replies", authMiddleware, sparkCommentController.addReply);
+
 // POST /spark-comments -> Add a comment
 router.post("/", authMiddleware, sparkCommentController.addComment);
 

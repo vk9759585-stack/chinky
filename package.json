@@ -5,9 +5,13 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "check:syntax": "node --check server.js",
+    "smoke:health": "node smoke-tests/run-newman.js --folder Health",
+    "smoke:full": "node smoke-tests/run-newman.js"
   },
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "axios": "^1.19.0",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^2.10.0",
@@ -23,6 +27,7 @@
     "nodemailer": "^7.0.13",
     "otp-generator": "^4.0.1",
     "razorpay": "^2.9.8",
+    "redis": "^4.7.0",
     "socket.io": "^4.8.1",
     "uuid": "^11.1.0"
   },

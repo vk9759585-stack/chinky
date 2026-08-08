@@ -23,4 +23,20 @@ router.delete(
     controller.unfollowUser
 );
 
+// ====================================
+// FOLLOW LISTS
+// ====================================
+
+router.get(
+    "/:id/followers",
+    auth,
+    controller.getFollowers
+);
+
+router.get(
+    "/:id/following",
+    auth,
+    controller.getFollowing
+);
+
 module.exports = router;

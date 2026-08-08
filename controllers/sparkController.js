@@ -1,6 +1,36 @@
 const Spark = require("../models/Spark");
+const Report = require("../models/Report");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
+const Wallet = require("../models/Wallet");
+const Gift = require("../models/Gift");
+const { SPARK_GIFT_MIN_FOLLOWERS, splitCoins } = require('../config/monetization');
+const { changeCoins, creditCreatorEarnings, runFinancialTransaction } = require('../services/walletAccountingService');
+
+const sparkThumbnail = (upload) => {
+    if (!upload || !upload.public_id) return "";
+    try {
+        return cloudinary.url(upload.public_id, {
+            resource_type: "video",
+            secure: true,
+            format: "jpg",
+            transformation: [{ width: 720, height: 1280, crop: "fill", gravity: "auto" }]
+        });
+    } catch (_) {
+        return "";
+    }
+};
+
+const listFromBody = (value) => {
+    if (Array.isArray(value)) return value;
+    if (typeof value !== "string" || !value.trim()) return [];
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+        return [];
+    }
+};
 
 // ======================================
 // CREATE SPARK
@@ -8,55 +38,42 @@ const fs = require("fs");
 
 exports.createSpark = async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: "Spark video is required"
-            });
-        }
+        if (!req.file) return res.status(400).json({ success: false, message: "Spark video is required" });
 
-        let videoUrl;
-
+        let videoUrl = "";
+        let videoPublicId = "";
+        let thumbnail = (req.body.thumbnail || "").trim();
         try {
-            const upload = await cloudinary.uploader.upload(
-                req.file.path,
-                {
-                    resource_type: "video",
-                    folder: "chinky/sparks"
-                }
-            );
-
+            const upload = await cloudinary.uploader.upload(req.file.path, {
+                resource_type: "video",
+                folder: "chinky/sparks"
+            });
             videoUrl = upload.secure_url;
-
+            videoPublicId = upload.public_id || "";
+            if (!thumbnail) thumbnail = sparkThumbnail(upload);
             await fs.promises.unlink(req.file.path).catch(() => {});
-        } catch (error) {
-            videoUrl = `${req.protocol}://${req.get(
-                "host"
-            )}/uploads/${req.file.filename}`;
+        } catch (_) {
+            videoUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
         }
 
         const spark = await Spark.create({
             user: req.user.id,
-            caption: req.body.caption,
+            caption: req.body.caption || "",
             video: videoUrl,
-            thumbnail: req.body.thumbnail,
-            music: req.body.music,
-            filter: req.body.filter,
-            duration: req.body.duration,
-            hashtags: req.body.hashtags
+            videoPublicId,
+            thumbnail,
+            music: req.body.music || "",
+            filter: req.body.filter || "Original",
+            duration: Number(req.body.duration) || 0,
+            hashtags: listFromBody(req.body.hashtags),
+            location: req.body.location || "",
+            taggedUsers: listFromBody(req.body.taggedUsers),
+            products: listFromBody(req.body.products)
         });
 
-        return res.status(201).json({
-            success: true,
-            data: spark
-        });
-
+        return res.status(201).json({ success: true, data: spark });
     } catch (err) {
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
 
@@ -66,42 +83,51 @@ exports.createSpark = async (req, res) => {
 
 exports.getSparks = async (req, res) => {
     try {
-        const sparks = await Spark.find()
-            .populate(
-                "user",
-                "username profileImage verified isPrivate followers"
-            )
-            .sort({
-                createdAt: -1
-            });
+        // Spark feed must reflect a newly published Spark immediately. Prevent
+        // proxies/clients from reusing a stale list response.
+        res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.set("Pragma", "no-cache");
+        res.set("Expires", "0");
+        const viewerId = (req.user.id || req.user._id || req.user.userId).toString();
+        const limit = Math.min(Math.max(Number(req.query.limit) || 15, 1), 30);
+        const before = req.query.before ? new Date(req.query.before) : null;
+        const filter = before && !Number.isNaN(before.getTime()) ? { createdAt: { $lt: before } } : {};
 
-        const visibleSparks = sparks.filter((spark) => {
+        // Fetch a small page instead of loading the whole Spark collection.
+        // A little over-fetch helps after private-account filtering.
+        const sparks = await Spark.find(filter)
+            .populate("user", "name username profileImage verified isPrivate followers")
+            .sort({ createdAt: -1 })
+            .limit(limit * 2)
+            .lean();
+
+        const visible = [];
+        for (const spark of sparks) {
             const owner = spark.user;
+            if (!owner) continue;
+            const followers = Array.isArray(owner.followers) ? owner.followers : [];
+            const canView = !owner.isPrivate || owner._id.toString() === viewerId || followers.some((id) => id.toString() === viewerId);
+            if (!canView) continue;
 
-            if (!owner) {
-                return false;
-            }
-
-            return (
-                !owner.isPrivate ||
-                owner._id.toString() === req.user.id ||
-                owner.followers.some(
-                    (id) => id.toString() === req.user.id
-                )
-            );
-        });
+            const data = { ...spark, user: { ...owner } };
+            data.creatorFollowerCount = followers.length;
+            data.isFollowing = followers.some((id) => id.toString() === viewerId);
+            data.liked = (spark.likes || []).some((id) => id.toString() === viewerId);
+            data.saved = (spark.saves || []).some((id) => id.toString() === viewerId);
+            delete data.viewedBy;
+            delete data.user.followers;
+            visible.push(data);
+            if (visible.length >= limit) break;
+        }
 
         return res.json({
             success: true,
-            data: visibleSparks
+            count: visible.length,
+            data: visible,
+            nextCursor: visible.length ? visible[visible.length - 1].createdAt : null
         });
-
     } catch (err) {
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
 
@@ -112,39 +138,19 @@ exports.getSparks = async (req, res) => {
 exports.likeSpark = async (req, res) => {
     try {
         const spark = await Spark.findById(req.params.id);
+        if (!spark) return res.status(404).json({ success: false, message: "Spark not found" });
 
-        if (!spark) {
-            return res.status(404).json({
-                success: false,
-                message: "Spark not found"
-            });
-        }
+        const userId = (req.user.id || req.user._id || req.user.userId).toString();
+        const currentlyLiked = spark.likes.some((id) => id.toString() === userId);
+        const desired = typeof req.body?.liked === "boolean" ? req.body.liked : !currentlyLiked;
 
-        const userId = req.user.id;
-
-        const index = spark.likes.findIndex(
-            (id) => id.toString() === userId
-        );
-
-        if (index === -1) {
-            spark.likes.push(userId);
-        } else {
-            spark.likes.splice(index, 1);
-        }
-
+        if (desired && !currentlyLiked) spark.likes.addToSet(userId);
+        if (!desired && currentlyLiked) spark.likes.pull(userId);
         await spark.save();
 
-        return res.json({
-            success: true,
-            likes: spark.likes.length
-        });
-
+        return res.json({ success: true, liked: desired, likes: spark.likes.length });
     } catch (err) {
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
 
@@ -155,39 +161,19 @@ exports.likeSpark = async (req, res) => {
 exports.saveSpark = async (req, res) => {
     try {
         const spark = await Spark.findById(req.params.id);
+        if (!spark) return res.status(404).json({ success: false, message: "Spark not found" });
 
-        if (!spark) {
-            return res.status(404).json({
-                success: false,
-                message: "Spark not found"
-            });
-        }
+        const userId = (req.user.id || req.user._id || req.user.userId).toString();
+        const currentlySaved = spark.saves.some((id) => id.toString() === userId);
+        const desired = typeof req.body?.saved === "boolean" ? req.body.saved : !currentlySaved;
 
-        const userId = req.user.id;
-
-        const index = spark.saves.findIndex(
-            (id) => id.toString() === userId
-        );
-
-        if (index === -1) {
-            spark.saves.push(userId);
-        } else {
-            spark.saves.splice(index, 1);
-        }
-
+        if (desired && !currentlySaved) spark.saves.addToSet(userId);
+        if (!desired && currentlySaved) spark.saves.pull(userId);
         await spark.save();
 
-        return res.json({
-            success: true,
-            saves: spark.saves.length
-        });
-
+        return res.json({ success: true, saved: desired, saves: spark.saves.length });
     } catch (err) {
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
 
@@ -197,30 +183,18 @@ exports.saveSpark = async (req, res) => {
 
 exports.addView = async (req, res) => {
     try {
-        const spark = await Spark.findById(req.params.id);
-
-        if (!spark) {
-            return res.status(404).json({
-                success: false,
-                message: "Spark not found"
-            });
-        }
-
-        spark.views += 1;
-
-        await spark.save();
-
-        return res.json({
-            success: true,
-            views: spark.views
-        });
-
+        const userId = (req.user.id || req.user._id || req.user.userId).toString();
+        const spark = await Spark.findOneAndUpdate(
+            { _id: req.params.id, viewedBy: { $ne: userId } },
+            { $addToSet: { viewedBy: userId }, $inc: { views: 1 } },
+            { new: true }
+        );
+        if (spark) return res.json({ success: true, views: spark.views, counted: true });
+        const existing = await Spark.findById(req.params.id).select("views");
+        if (!existing) return res.status(404).json({ success: false, message: "Spark not found" });
+        return res.json({ success: true, views: existing.views, counted: false });
     } catch (err) {
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
 
@@ -230,7 +204,11 @@ exports.addView = async (req, res) => {
 
 exports.shareSpark = async (req, res) => {
     try {
-        const spark = await Spark.findById(req.params.id);
+        const spark = await Spark.findByIdAndUpdate(
+            req.params.id,
+            { $inc: { shares: 1 } },
+            { new: true }
+        ).select("shares");
 
         if (!spark) {
             return res.status(404).json({
@@ -239,20 +217,106 @@ exports.shareSpark = async (req, res) => {
             });
         }
 
-        spark.shares += 1;
-
-        await spark.save();
-
         return res.json({
             success: true,
             shares: spark.shares
         });
-
     } catch (err) {
-
         return res.status(500).json({
             success: false,
             message: err.message
         });
     }
+};
+
+exports.deleteSpark = async (req, res) => {
+    try {
+        const spark = await Spark.findById(req.params.id).select("user video thumbnail");
+        if (!spark) {
+            return res.status(404).json({ success: false, message: "Spark not found" });
+        }
+        if (spark.user.toString() !== req.user.id.toString()) {
+            return res.status(403).json({ success: false, message: "You can only delete your own Spark" });
+        }
+
+        if (spark.videoPublicId) {
+            try {
+                await cloudinary.uploader.destroy(spark.videoPublicId, { resource_type: "video" });
+            } catch (_) {}
+        }
+
+        await Spark.findByIdAndDelete(req.params.id);
+        return res.json({ success: true, message: "Spark deleted" });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.reportSpark = async (req, res) => {
+    try {
+        const spark = await Spark.findById(req.params.id).select("user");
+        if (!spark) {
+            return res.status(404).json({ success: false, message: "Spark not found" });
+        }
+
+        const reason = (req.body.reason || "").trim();
+        if (!reason) {
+            return res.status(400).json({ success: false, message: "Reason is required" });
+        }
+
+        await Report.create({
+            reporter: req.user.id,
+            targetUser: spark.user,
+            targetSpark: spark._id,
+            reason,
+            status: "pending",
+        });
+
+        return res.json({ success: true, message: "Report submitted" });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.sendGift = async (req, res) => {
+    try {
+        const packs = {
+            Sawan: 10, "Hurts Me": 99, "Sawan Food": 299, Peachy: 439,
+            "Jhula Bloom": 599, Sindoor: 999, "Monsoon Love": 4999,
+            "Gold Rose": 9999, "Mor Crown": 99, "Big Kiss": 199,
+            "Wedding Mala": 139, "Love U": 399, "Pappi Jodi": 1899,
+            "Timeless Love": 39999, "Eternal Love": 99999,
+            "Rose Wedding": 139999,
+        };
+        const cost = packs[req.body.giftName];
+        if (!cost) return res.status(400).json({ success: false, message: "Invalid gift" });
+        const spark = await Spark.findById(req.params.id).populate("user", "followers");
+        if (!spark) return res.status(404).json({ success: false, message: "Spark not found" });
+        if (spark.user._id.toString() === req.user.id) return res.status(400).json({ success: false, message: "You cannot send a gift to yourself" });
+        if (spark.user.followers.length < SPARK_GIFT_MIN_FOLLOWERS) return res.status(403).json({ success: false, message: "Gifts unlock at 5,000 followers" });
+        const { creatorCoins, platformCoins } = splitCoins(cost);
+        const result = await runFinancialTransaction(async (session) => {
+            const gift = await Gift.create([{
+                sender: req.user.id,
+                receiver: spark.user._id,
+                giftName: req.body.giftName,
+                coins: cost,
+                sourceType: 'spark',
+                sourceId: spark._id.toString(),
+                creatorShareCoins: creatorCoins,
+                platformShareCoins: platformCoins,
+            }], { session });
+            const referenceId = gift[0]._id.toString();
+            const senderWallet = await changeCoins({
+                user: req.user.id, delta: -cost, transactionType: 'spark_gift_sent',
+                referenceType: 'gift', referenceId, metadata: { sparkId: spark._id.toString(), giftName: req.body.giftName }, session,
+            });
+            await creditCreatorEarnings({
+                user: spark.user._id, coins: creatorCoins, transactionType: 'spark_gift_received',
+                referenceType: 'gift', referenceId, metadata: { sparkId: spark._id.toString(), giftName: req.body.giftName }, session,
+            });
+            return { gift: gift[0], coins: senderWallet.coins };
+        });
+        return res.json({ success: true, coins: result.coins, gift: { id: result.gift._id, name: result.gift.giftName, coins: result.gift.coins } });
+    } catch (err) { return res.status(500).json({ success: false, message: err.message }); }
 };

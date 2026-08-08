@@ -13,6 +13,7 @@ const walletController = require("../controllers/walletController");
 
 // GET /wallet -> Get user wallet details
 router.get("/", authMiddleware, walletController.getWallet);
+router.get("/coin-packages", authMiddleware, walletController.getCoinPackages);
 
 // PUT /wallet/coins -> Add coins to wallet
 router.put("/coins", authMiddleware, walletController.addCoins);

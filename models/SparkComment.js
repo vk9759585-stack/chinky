@@ -14,9 +14,16 @@ const reelCommentSchema = new mongoose.Schema(
             required: true
         },
 
+        parentComment: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "SparkComment",
+            default: null
+        },
+
         comment: {
             type: String,
-            required: true
+            required: true,
+            trim: true
         },
 
         likes: [
@@ -30,6 +37,9 @@ const reelCommentSchema = new mongoose.Schema(
         timestamps: true
     }
 );
+
+reelCommentSchema.index({ reel: 1, createdAt: -1 });
+reelCommentSchema.index({ parentComment: 1, createdAt: 1 });
 
 module.exports = mongoose.model(
     "SparkComment",

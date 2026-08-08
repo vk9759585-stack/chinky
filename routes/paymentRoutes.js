@@ -6,6 +6,10 @@ const controller = require(
     "../controllers/paymentController"
 );
 
+router.get('/coins/config', auth, controller.getCoinCheckoutConfig);
+router.post('/coins/order', auth, controller.createCoinOrder);
+router.post('/coins/verify', auth, controller.verifyCoinPayment);
+
 // ====================================
 // CREATE PAYMENT ORDER
 // ====================================
