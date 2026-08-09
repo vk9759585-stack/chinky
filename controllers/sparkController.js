@@ -4,6 +4,8 @@ const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
 const Wallet = require("../models/Wallet");
 const Gift = require("../models/Gift");
+const Audio = require("../models/Audio");
+const { createSocialNotification } = require("../services/socialNotificationService");
 const { SPARK_GIFT_MIN_FOLLOWERS, splitCoins, getGift } = require('../config/monetization');
 const { changeCoins, creditCreatorEarnings, runFinancialTransaction } = require('../services/walletAccountingService');
 
@@ -63,6 +65,7 @@ exports.createSpark = async (req, res) => {
             videoPublicId,
             thumbnail,
             music: req.body.music || "",
+            audio: req.body.audioId || null,
             filter: req.body.filter || "Original",
             duration: Number(req.body.duration) || 0,
             hashtags: listFromBody(req.body.hashtags),
@@ -70,6 +73,26 @@ exports.createSpark = async (req, res) => {
             taggedUsers: listFromBody(req.body.taggedUsers),
             products: listFromBody(req.body.products)
         });
+
+        if (req.body.audioId) {
+            await Audio.updateOne({ _id: req.body.audioId, reusable: true, blocked: false }, { $inc: { usageCount: 1 } }).catch(() => {});
+        } else if (videoPublicId) {
+            try {
+                const audioUrl = cloudinary.url(videoPublicId, { resource_type: "video", secure: true, format: "mp3" });
+                const audio = await Audio.create({
+                    owner: req.user.id,
+                    sourceSpark: spark._id,
+                    title: req.body.music && req.body.music !== "Mute" ? req.body.music : "Original audio",
+                    streamUrl: audioUrl,
+                    duration: Number(req.body.duration) || 0,
+                    coverUrl: thumbnail,
+                    isOriginal: true,
+                    reusable: true
+                });
+                spark.audio = audio._id;
+                await spark.save();
+            } catch (_) {}
+        }
 
         return res.status(201).json({ success: true, data: spark });
     } catch (err) {
@@ -97,6 +120,7 @@ exports.getSparks = async (req, res) => {
         // A little over-fetch helps after private-account filtering.
         const sparks = await Spark.find(filter)
             .populate("user", "name username profileImage verified isPrivate followers")
+            .populate("audio", "title artistName streamUrl duration coverUrl owner usageCount")
             .sort({ createdAt: -1 })
             .limit(limit * 2)
             .lean();
@@ -147,6 +171,16 @@ exports.likeSpark = async (req, res) => {
         if (desired && !currentlyLiked) spark.likes.addToSet(userId);
         if (!desired && currentlyLiked) spark.likes.pull(userId);
         await spark.save();
+        if (desired && spark.user.toString() !== userId) {
+            await createSocialNotification(req, {
+                sender: userId,
+                receiver: spark.user,
+                type: "spark_like",
+                title: "New Spark like",
+                body: "liked your Spark",
+                link: `/spark/${spark._id}`
+            }).catch(() => {});
+        }
 
         return res.json({ success: true, liked: desired, likes: spark.likes.length });
     } catch (err) {

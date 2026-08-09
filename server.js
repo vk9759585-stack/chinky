@@ -118,6 +118,7 @@ app.use("/api/chat", require("./routes/chatRoutes"));
 
 // SPARK
 app.use("/api/spark", require("./routes/sparkRoutes"));
+app.use("/api/audio", require("./routes/audioRoutes"));
 app.use("/api/reels", require("./routes/sparkRoutes"));
 app.use("/api/spark-comments", require("./routes/sparkCommentRoutes"));
 
@@ -195,6 +196,7 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
   },
 });
+app.set("io", io);
 
 require("./socket/socket")(io);
 require("./config/redisAdapter")(io).catch((error) => {

@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const User = require("../models/User");
+const { createSocialNotification } = require("../services/socialNotificationService");
 
 const publicUserFields = "name username profileImage verified";
 
@@ -44,6 +45,14 @@ exports.followUser = async (req, res) => {
     ]);
 
     const relation = await relationshipPayload(myId, userId);
+    await createSocialNotification(req, {
+      sender: myId,
+      receiver: userId,
+      type: "follow",
+      title: "New follower",
+      body: "started following you",
+      link: `/profile/${myId}`
+    }).catch(() => {});
     return res.status(200).json({ success: true, message: "User followed successfully", ...relation });
   } catch (err) {
     console.error("Follow user error:", err);

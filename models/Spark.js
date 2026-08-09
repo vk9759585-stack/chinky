@@ -33,6 +33,12 @@ const reelSchema = new mongoose.Schema(
             default: ""
         },
 
+        audio: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Audio",
+            default: null
+        },
+
         filter: {
             type: String,
             default: "Original"

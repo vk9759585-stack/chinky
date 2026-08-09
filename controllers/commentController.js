@@ -1,5 +1,6 @@
 const Comment = require("../models/Comment");
 const Post = require("../models/Post");
+const { createSocialNotification } = require("../services/socialNotificationService");
 
 // =====================================
 // GET COMMENTS
@@ -75,6 +76,17 @@ exports.addComment = async (req, res) => {
 
         const result = await Comment.findById(comment._id)
             .populate("user", "username profileImage");
+        const senderId = req.user.id || req.user._id || req.user.userId;
+        if (post.user && post.user.toString() !== senderId.toString()) {
+            await createSocialNotification(req, {
+                sender: senderId,
+                receiver: post.user,
+                type: "comment",
+                title: "New comment",
+                body: text.length > 80 ? `${text.slice(0, 77)}...` : text,
+                link: `/post/${post._id}`
+            }).catch(() => {});
+        }
 
         return res.status(201).json({
             success: true,

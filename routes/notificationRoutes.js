@@ -20,6 +20,9 @@ router.post(
 // GET NOTIFICATIONS
 // ====================================
 
+router.get("/unread-count", auth, controller.unreadCount);
+router.put("/read-all", auth, controller.markAllRead);
+
 router.get(
     "/",
     auth,

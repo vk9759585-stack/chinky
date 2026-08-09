@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Post = require("../models/Post");
+const { createSocialNotification } = require("../services/socialNotificationService");
 
 function viewerIdFromRequest(req) {
   const raw = req.user?.id || req.user?._id || req.user?.userId;
@@ -18,7 +19,7 @@ exports.likePost = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid post id" });
     }
 
-    const existing = await Post.findById(postId).select("likes");
+    const existing = await Post.findById(postId).select("likes user");
     if (!existing) {
       return res.status(404).json({ success: false, message: "Post not found" });
     }
@@ -36,6 +37,16 @@ exports.likePost = async (req, res) => {
 
     const liked = Array.isArray(post?.likes) && post.likes.some((id) => id.toString() === userId);
     const likes = Array.isArray(post?.likes) ? post.likes.length : 0;
+    if (liked && !currentlyLiked && existing.user && existing.user.toString() !== userId) {
+      await createSocialNotification(req, {
+        sender: userId,
+        receiver: existing.user,
+        type: "like",
+        title: "New like",
+        body: "liked your post",
+        link: `/post/${postId}`
+      }).catch(() => {});
+    }
 
     return res.status(200).json({
       success: true,

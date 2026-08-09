@@ -6,8 +6,9 @@ const Notification = require("../models/Notification");
 
 exports.createNotification = async (req, res) => {
     try {
+        const senderId = req.user.id || req.user._id || req.user.userId;
         const notification = await Notification.create({
-            sender: req.user.id,
+            sender: senderId,
             receiver: req.body.receiver,
             type: req.body.type,
             title: req.body.title,
@@ -39,7 +40,7 @@ exports.createNotification = async (req, res) => {
 exports.getNotifications = async (req, res) => {
     try {
         const notifications = await Notification.find({
-            receiver: req.user.id
+            receiver: req.user.id || req.user._id || req.user.userId
         })
             .populate(
                 "sender",
@@ -72,16 +73,13 @@ exports.getNotifications = async (req, res) => {
 exports.markRead = async (req, res) => {
     try {
 
-        const notification =
-            await Notification.findByIdAndUpdate(
-                req.params.id,
-                {
-                    isRead: true
-                },
-                {
-                    new: true
-                }
-            );
+        const userId = (req.user.id || req.user._id || req.user.userId).toString();
+        const notification = await Notification.findOneAndUpdate(
+            { _id: req.params.id, receiver: userId },
+            { isRead: true, readAt: new Date() },
+            { new: true }
+        );
+        if (!notification) return res.status(404).json({ success: false, message: "Notification not found" });
 
         return res.json({
             success: true,
@@ -122,4 +120,24 @@ exports.deleteNotification = async (req, res) => {
         });
 
     }
+};
+
+exports.markAllRead = async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    await Notification.updateMany({ receiver: userId, isRead: false }, { $set: { isRead: true, readAt: new Date() } });
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.unreadCount = async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    const count = await Notification.countDocuments({ receiver: userId, isRead: false });
+    return res.json({ success: true, count });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 };

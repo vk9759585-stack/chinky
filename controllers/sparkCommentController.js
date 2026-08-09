@@ -1,5 +1,6 @@
 const SparkComment = require("../models/SparkComment");
 const Spark = require("../models/Spark");
+const { createSocialNotification } = require("../services/socialNotificationService");
 
 const populatedComment = (id) => SparkComment.findById(id)
     .populate("user", "name username profileImage verified")
@@ -12,7 +13,7 @@ exports.addComment = async (req, res) => {
         if (!reelId) return res.status(400).json({ success: false, message: "Spark ID is required" });
         if (!text) return res.status(400).json({ success: false, message: "Comment is required" });
 
-        const spark = await Spark.findById(reelId).select("_id comments");
+        const spark = await Spark.findById(reelId).select("_id comments user");
         if (!spark) return res.status(404).json({ success: false, message: "Spark not found" });
 
         const comment = await SparkComment.create({ reel: reelId, user: req.user.id, comment: text });
@@ -20,6 +21,17 @@ exports.addComment = async (req, res) => {
         await spark.save();
 
         const result = await populatedComment(comment._id);
+        const senderId = req.user.id || req.user._id || req.user.userId;
+        if (spark.user && spark.user.toString() !== senderId.toString()) {
+            await createSocialNotification(req, {
+                sender: senderId,
+                receiver: spark.user,
+                type: "comment",
+                title: "New Spark comment",
+                body: text.length > 80 ? `${text.slice(0, 77)}...` : text,
+                link: `/spark/${spark._id}`
+            }).catch(() => {});
+        }
         return res.status(201).json({ success: true, data: result, comments: spark.comments.length });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
