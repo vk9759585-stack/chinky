@@ -320,7 +320,6 @@ exports.sendGift = async (req, res) => {
         const spark = await Spark.findById(req.params.id).populate("user", "followers");
         if (!spark) return res.status(404).json({ success: false, message: "Spark not found" });
         if (spark.user._id.toString() === req.user.id) return res.status(400).json({ success: false, message: "You cannot send a gift to yourself" });
-        if (spark.user.followers.length < SPARK_GIFT_MIN_FOLLOWERS) return res.status(403).json({ success: false, message: "Gifts unlock at 5,000 followers" });
         const { creatorCoins, platformCoins } = splitCoins(cost);
         const result = await runFinancialTransaction(async (session) => {
             const gift = await Gift.create([{

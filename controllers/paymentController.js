@@ -16,7 +16,8 @@ exports.getCoinCheckoutConfig = (_, res) => res.json({
     key: process.env.RAZORPAY_KEY || null,
     enabled: Boolean(razorpay && process.env.RAZORPAY_KEY),
     upiEnabled: Boolean(razorpay && process.env.RAZORPAY_KEY),
-    coinValuePaise: require('../config/monetization').COIN_VALUE_PAISE,
+    purchaseCoinsPerRupee: require('../config/monetization').PURCHASE_COINS_PER_RUPEE,
+    minimumPurchasePaise: require('../config/monetization').MINIMUM_PURCHASE_PAISE,
 });
 
 exports.createCoinOrder = async (req, res) => {
@@ -189,4 +190,21 @@ exports.createOrder = async (req, res) => {
             message: err.message
         });
     }
+};
+
+exports.createUpiCoinRequest = async (req,res)=>{
+  try{
+    const upiId=String(req.body.upiId||'').trim().toLowerCase();
+    const coinPackage=getCoinPackage(String(req.body.packageId||''));
+    if(!coinPackage) return res.status(400).json({success:false,message:'Invalid coin package.'});
+    if(!/^[\w.-]{2,}@[a-zA-Z]{2,}$/.test(upiId)) return res.status(400).json({success:false,message:'Enter a valid UPI ID.'});
+    const UpiCoinRequest=require('../models/UpiCoinRequest');
+    const row=await UpiCoinRequest.create({user:req.user.id,packageId:coinPackage.id,upiId,amountPaise:coinPackage.amountPaise,coins:coinPackage.coins});
+    return res.status(201).json({success:true,data:{id:row._id,status:row.status,amountPaise:row.amountPaise,coins:row.coins}});
+  }catch(e){ return res.status(500).json({success:false,message:'UPI request could not be created.'}); }
+};
+exports.getMyUpiCoinRequests = async (req,res)=>{
+  const UpiCoinRequest=require('../models/UpiCoinRequest');
+  const rows=await UpiCoinRequest.find({user:req.user.id}).sort({createdAt:-1}).limit(20).lean();
+  res.json({success:true,data:rows});
 };

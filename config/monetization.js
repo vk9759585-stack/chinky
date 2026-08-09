@@ -1,68 +1,63 @@
-/**
- * Server-authoritative monetization rules. Amounts are integers only:
- * coin values are whole Chinky Coins and money values are paise.
- */
+/** Server-authoritative CHINKY monetization rules. */
 const CREATOR_GIFT_SHARE_BPS = 7000;
 const PLATFORM_GIFT_SHARE_BPS = 3000;
-const SPARK_GIFT_MIN_FOLLOWERS = 5000;
-const MINIMUM_WITHDRAWAL_PAISE = 50000;
+const SPARK_GIFT_MIN_FOLLOWERS = 0;
 
-// Guaranteed 7-day login rewards. These are real CHINKY wallet coins,
-// credited server-side only after a successful daily claim.
+// Final requested rates.
+const PURCHASE_COINS_PER_RUPEE = 17;      // ₹1 = 17 purchase coins
+const WITHDRAW_COINS_PER_RUPEE = 25;      // 25 earned coins = ₹1
+const PURCHASE_TO_WITHDRAW_MARGIN_PERCENT = Math.round((1 - PURCHASE_COINS_PER_RUPEE / WITHDRAW_COINS_PER_RUPEE) * 100); // 32%
+const MINIMUM_PURCHASE_PAISE = 2000;      // ₹20
+const MINIMUM_WITHDRAWAL_COINS = 500;      // ₹20 at 25 coins/₹
 const DAILY_CHECKIN_REWARDS = Object.freeze([1, 2, 3, 4, 5, 7, 10]);
 
-// CHINKY Coins are virtual in-app currency. Base display conversion:
-// 10 coins = ₹1, therefore 1 coin = 10 paise. Server remains authoritative.
-const COIN_VALUE_PAISE = 10;
 const GIFT_CATALOG = Object.freeze([
-  { name: 'Sawan', coins: 1 },
-  { name: 'Hurts Me', coins: 2 },
-  { name: 'Sawan Food', coins: 3 },
-  { name: 'Peachy', coins: 5 },
-  { name: 'Mor Crown', coins: 7 },
-  { name: 'Wedding Mala', coins: 10 },
-  { name: 'Big Kiss', coins: 15 },
-  { name: 'Love U', coins: 20 },
-  { name: 'Jhula Bloom', coins: 25 },
-  { name: 'Sindoor', coins: 30 },
-  { name: 'Monsoon Love', coins: 50 },
-  { name: 'Pappi Jodi', coins: 75 },
-  { name: 'Gold Rose', coins: 100 },
-  { name: 'Timeless Love', coins: 200 },
-  { name: 'Eternal Love', coins: 500 },
-  { name: 'Rose Wedding', coins: 1000 },
+  { name: 'Spark', icon: '✨', coins: 5 },
+  { name: 'Heart', icon: '❤️', coins: 10 },
+  { name: 'Flower', icon: '🌸', coins: 20 },
+  { name: 'Star', icon: '⭐', coins: 35 },
+  { name: 'Rose', icon: '🌹', coins: 50 },
+  { name: 'Crown', icon: '👑', coins: 75 },
+  { name: 'Kiss', icon: '💋', coins: 100 },
+  { name: 'Love', icon: '💖', coins: 150 },
+  { name: 'Diamond', icon: '💎', coins: 250 },
+  { name: 'Celebration', icon: '🎉', coins: 500 },
+  { name: 'Royal', icon: '🏆', coins: 1000 },
+  { name: 'Galaxy', icon: '🌌', coins: 2500 },
 ]);
 const getGift = (name) => GIFT_CATALOG.find((item) => item.name === name);
 
+const packageFor = (rupees, discountPercent = 0) => {
+  const baseCoins = rupees * PURCHASE_COINS_PER_RUPEE;
+  const bonusCoins = Math.floor((baseCoins * discountPercent) / 100);
+  return Object.freeze({
+    id: `coins_${rupees}`,
+    amountPaise: rupees * 100,
+    baseCoins,
+    bonusCoins,
+    discountPercent,
+    coins: baseCoins + bonusCoins,
+    androidProductId: `chinky_coins_${rupees}`,
+    iosProductId: `chinky_coins_${rupees}`,
+  });
+};
 
 const COIN_PACKAGES = Object.freeze([
-  { id: 'coins_10', amountPaise: 100, coins: 10, androidProductId: 'chinky_coins_10', iosProductId: 'chinky_coins_10' },
-  { id: 'coins_50', amountPaise: 500, coins: 50, androidProductId: 'chinky_coins_50', iosProductId: 'chinky_coins_50' },
-  { id: 'coins_100', amountPaise: 1000, coins: 100, androidProductId: 'chinky_coins_100', iosProductId: 'chinky_coins_100' },
-  { id: 'coins_200', amountPaise: 2000, coins: 200, androidProductId: 'chinky_coins_200', iosProductId: 'chinky_coins_200' },
-  { id: 'coins_500', amountPaise: 5000, coins: 500, androidProductId: 'chinky_coins_500', iosProductId: 'chinky_coins_500' },
-  { id: 'coins_1000', amountPaise: 10000, coins: 1000, androidProductId: 'chinky_coins_1000', iosProductId: 'chinky_coins_1000' },
-  { id: 'coins_2000', amountPaise: 20000, coins: 2000, androidProductId: 'chinky_coins_2000', iosProductId: 'chinky_coins_2000' },
-  { id: 'coins_5000', amountPaise: 50000, coins: 5000, androidProductId: 'chinky_coins_5000', iosProductId: 'chinky_coins_5000' },
-  { id: 'coins_10000', amountPaise: 100000, coins: 10000, androidProductId: 'chinky_coins_10000', iosProductId: 'chinky_coins_10000' },
+  packageFor(20),
+  packageFor(49),
+  packageFor(99),
+  packageFor(199),
+  packageFor(499, 5),
+  packageFor(999, 8),
+  packageFor(1999, 10),
 ]);
-
-const getCoinPackage = (packageId) => COIN_PACKAGES.find((item) => item.id === packageId);
-const splitCoins = (coins) => ({
-  creatorCoins: Math.floor((coins * CREATOR_GIFT_SHARE_BPS) / 10000),
-  platformCoins: coins - Math.floor((coins * CREATOR_GIFT_SHARE_BPS) / 10000),
-});
+const getCoinPackage = (id) => COIN_PACKAGES.find((item) => item.id === id);
+const splitCoins = (coins) => { const creatorCoins = Math.floor((coins * CREATOR_GIFT_SHARE_BPS) / 10000); return { creatorCoins, platformCoins: coins - creatorCoins }; };
+const withdrawCoinsToPaise = (coins) => Math.floor((coins * 100) / WITHDRAW_COINS_PER_RUPEE);
 
 module.exports = {
-  CREATOR_GIFT_SHARE_BPS,
-  PLATFORM_GIFT_SHARE_BPS,
-  SPARK_GIFT_MIN_FOLLOWERS,
-  MINIMUM_WITHDRAWAL_PAISE,
-  DAILY_CHECKIN_REWARDS,
-  COIN_VALUE_PAISE,
-  GIFT_CATALOG,
-  getGift,
-  COIN_PACKAGES,
-  getCoinPackage,
-  splitCoins,
+  CREATOR_GIFT_SHARE_BPS, PLATFORM_GIFT_SHARE_BPS, SPARK_GIFT_MIN_FOLLOWERS,
+  PURCHASE_COINS_PER_RUPEE, WITHDRAW_COINS_PER_RUPEE, PURCHASE_TO_WITHDRAW_MARGIN_PERCENT,
+  MINIMUM_PURCHASE_PAISE, MINIMUM_WITHDRAWAL_COINS, DAILY_CHECKIN_REWARDS,
+  COIN_PACKAGES, GIFT_CATALOG, getGift, getCoinPackage, splitCoins, withdrawCoinsToPaise,
 };

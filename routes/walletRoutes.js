@@ -1,28 +1,15 @@
-const express = require("express");
-const router = express.Router();
-
-// Middleware
-const authMiddleware = require("../middleware/authMiddleware");
-
-// Controller
-const walletController = require("../controllers/walletController");
-const dailyCheckInController = require("../controllers/dailyCheckInController");
-
-// ====================================
-// WALLET ROUTES
-// ====================================
-
-// GET /wallet -> Get user wallet details
-router.get("/", authMiddleware, walletController.getWallet);
-router.get("/coin-packages", authMiddleware, walletController.getCoinPackages);
-router.get("/activity", authMiddleware, walletController.getActivity);
-router.get("/gifts", authMiddleware, walletController.getGiftCatalog);
-
-// Real 7-day daily check-in rewards. Server decides streak and coin credit.
-router.get("/check-in", authMiddleware, dailyCheckInController.getStatus);
-router.post("/check-in/claim", authMiddleware, dailyCheckInController.claim);
-
-// PUT /wallet/coins -> Add coins to wallet
-router.put("/coins", authMiddleware, walletController.addCoins);
-
+const router = require('express').Router();
+const auth = require('../middleware/authMiddleware');
+const wallet = require('../controllers/walletController');
+const checkin = require('../controllers/dailyCheckInController');
+router.get('/', auth, wallet.getWallet);
+router.get('/coin-packages', auth, wallet.getCoinPackages);
+router.get('/activity', auth, wallet.getActivity);
+router.get('/gifts', auth, wallet.getGiftCatalog);
+router.get('/monetization', auth, wallet.getMonetizationConfig);
+router.get('/withdrawals', auth, wallet.getWithdrawalRequests);
+router.post('/withdrawals', auth, wallet.createWithdrawalRequest);
+router.get('/check-in', auth, checkin.getStatus);
+router.post('/check-in/claim', auth, checkin.claim);
+router.put('/coins', auth, wallet.addCoins);
 module.exports = router;

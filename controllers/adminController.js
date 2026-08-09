@@ -193,3 +193,89 @@ exports.getWalletLedger = async (req, res) => {
         return res.status(500).json({ success: false, message: 'Could not load ledger entries.' });
     }
 };
+
+
+exports.getWithdrawals = async (req, res) => {
+  try {
+    const WithdrawalRequest = require('../models/WithdrawalRequest');
+    const rows = await WithdrawalRequest.find({}).populate('user', 'username email').sort({ createdAt: -1 }).limit(100).lean();
+    return res.json({ success: true, data: rows });
+  } catch (err) { return res.status(500).json({ success: false, message: 'Withdrawals could not be loaded.' }); }
+};
+
+exports.updateWithdrawalStatus = async (req, res) => {
+  const status = String(req.body.status || '');
+  if (!['paid', 'rejected'].includes(status)) return res.status(400).json({ success: false, message: 'Status must be paid or rejected.' });
+  try {
+    const WithdrawalRequest = require('../models/WithdrawalRequest');
+    const { creditCreatorEarnings, runFinancialTransaction } = require('../services/walletAccountingService');
+    const result = await runFinancialTransaction(async (session) => {
+      const row = await WithdrawalRequest.findById(req.params.id).session(session);
+      if (!row) throw new Error('Withdrawal not found');
+      if (row.status !== 'pending') return row;
+      row.status = status; row.reviewedBy = req.user.id; row.reviewedAt = new Date(); row.note = String(req.body.note || '');
+      await row.save({ session });
+      if (status === 'rejected') {
+        await creditCreatorEarnings({ user: row.user, coins: row.coins, transactionType: 'withdrawal_refund', referenceType: 'withdrawal', referenceId: row._id, metadata: { reason: row.note }, session });
+      }
+      return row;
+    });
+    return res.json({ success: true, data: result });
+  } catch (err) { return res.status(400).json({ success: false, message: err.message || 'Withdrawal could not be updated.' }); }
+};
+
+// ===================================
+// MANUAL UPI COIN REQUESTS
+// ===================================
+exports.getUpiCoinRequests = async (req,res)=>{
+  const UpiCoinRequest=require('../models/UpiCoinRequest');
+  const rows=await UpiCoinRequest.find({status:req.query.status||'pending'}).populate('user','username email').sort({createdAt:-1}).limit(100).lean();
+  res.json({success:true,data:rows});
+};
+exports.reviewUpiCoinRequest = async (req,res)=>{
+  try{
+    const UpiCoinRequest=require('../models/UpiCoinRequest');
+    const {runFinancialTransaction,changeCoins}=require('../services/walletAccountingService');
+    const decision=String(req.body.decision||'').toLowerCase();
+    if(!['approved','rejected'].includes(decision))return res.status(400).json({success:false,message:'Decision must be approved or rejected.'});
+    const row=await runFinancialTransaction(async(session)=>{
+      const request=await UpiCoinRequest.findById(req.params.id).session(session);
+      if(!request)throw new Error('Request not found');
+      if(request.status!=='pending')return request;
+      request.status=decision;request.reviewedBy=req.user.id;request.reviewedAt=new Date();await request.save({session});
+      if(decision==='approved')await changeCoins({user:request.user,delta:request.coins,transactionType:'coin_purchase',referenceType:'upi_request',referenceId:request._id,metadata:{packageId:request.packageId,amountPaise:request.amountPaise,upiId:request.upiId},session});
+      return request;
+    });
+    res.json({success:true,data:row});
+  }catch(e){res.status(400).json({success:false,message:e.message});}
+};
+
+// ===================================
+// WITHDRAWAL REQUESTS
+// ===================================
+exports.getWithdrawalRequests = async (req,res)=>{
+  const WithdrawalRequest=require('../models/WithdrawalRequest');
+  const rows=await WithdrawalRequest.find({status:req.query.status||'pending'}).populate('user','username email').sort({createdAt:-1}).limit(100).lean();
+  res.json({success:true,data:rows});
+};
+exports.reviewWithdrawalRequest = async (req,res)=>{
+  try{
+    const mongoose=require('mongoose');
+    const Wallet=require('../models/Wallet');
+    const WalletLedger=require('../models/WalletLedger');
+    const WithdrawalRequest=require('../models/WithdrawalRequest');
+    const decision=String(req.body.decision||'').toLowerCase();
+    if(!['approved','rejected'].includes(decision))return res.status(400).json({success:false,message:'Decision must be approved or rejected.'});
+    const session=await mongoose.startSession();let out;
+    try{await session.withTransaction(async()=>{
+      const row=await WithdrawalRequest.findById(req.params.id).session(session);if(!row)throw new Error('Request not found');if(row.status!=='pending'){out=row;return;}
+      if(decision==='approved'){
+        const wallet=await Wallet.findOne({user:row.user}).session(session);if(!wallet||(wallet.earnedCoins||0)<row.coins)throw new Error('Insufficient earned coin balance');
+        wallet.earnedCoins-=row.coins;wallet.totalWithdrawnPaise=(wallet.totalWithdrawnPaise||0)+row.amountPaise;await wallet.save({session});
+        await WalletLedger.create([{user:row.user,transactionType:'withdrawal',coinDelta:0,earningDeltaPaise:-row.amountPaise,balanceBefore:wallet.coins,balanceAfter:wallet.coins,referenceType:'withdrawal',referenceId:String(row._id),metadata:{coins:row.coins,amountPaise:row.amountPaise,upiId:row.upiId}}],{session});
+      }
+      row.status=decision;row.reviewedBy=req.user.id;row.reviewedAt=new Date();await row.save({session});out=row;
+    });}finally{await session.endSession();}
+    res.json({success:true,data:out});
+  }catch(e){res.status(400).json({success:false,message:e.message});}
+};

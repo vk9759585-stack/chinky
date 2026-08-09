@@ -8,6 +8,14 @@ const controller = require("../controllers/adminController");
 router.get('/monetization/overview', auth, isAdmin, controller.getMonetizationOverview);
 router.get('/monetization/ledger', auth, isAdmin, controller.getWalletLedger);
 
+router.get('/monetization/upi-requests', auth, isAdmin, controller.getUpiCoinRequests);
+router.post('/monetization/upi-requests/:id/review', auth, isAdmin, controller.reviewUpiCoinRequest);
+router.get('/monetization/withdrawals', auth, isAdmin, controller.getWithdrawalRequests);
+router.post('/monetization/withdrawals/:id/review', auth, isAdmin, controller.reviewWithdrawalRequest);
+
+router.get('/withdrawals', auth, isAdmin, controller.getWithdrawals);
+router.put('/withdrawals/:id/status', auth, isAdmin, controller.updateWithdrawalStatus);
+
 // ===================================
 // USERS
 // ===================================
