@@ -15,6 +15,8 @@ exports.getCoinCheckoutConfig = (_, res) => res.json({
     success: true,
     key: process.env.RAZORPAY_KEY || null,
     enabled: Boolean(razorpay && process.env.RAZORPAY_KEY),
+    upiEnabled: Boolean(razorpay && process.env.RAZORPAY_KEY),
+    coinValuePaise: require('../config/monetization').COIN_VALUE_PAISE,
 });
 
 exports.createCoinOrder = async (req, res) => {
@@ -26,7 +28,7 @@ exports.createCoinOrder = async (req, res) => {
             amount: coinPackage.amountPaise,
             currency: 'INR',
             receipt: `coins_${req.user.id}_${Date.now()}`.slice(0, 40),
-            notes: { userId: String(req.user.id), packageId: coinPackage.id },
+            notes: { userId: String(req.user.id), packageId: coinPackage.id, channel: 'upi_or_razorpay' },
         });
         await Payment.create({
             user: req.user.id,
@@ -88,6 +90,67 @@ exports.verifyCoinPayment = async (req, res) => {
         return res.json({ success: true, data: wallet });
     } catch (err) {
         return res.status(400).json({ success: false, message: err.message || 'Coin payment could not be verified.' });
+    }
+};
+
+
+
+// ======================================
+// GOOGLE PLAY / APP STORE COIN PURCHASE
+// ======================================
+exports.verifyStoreCoinPurchase = async (req, res) => {
+    const { platform, productId, purchaseId, verificationData } = req.body || {};
+    if (!['android', 'ios'].includes(platform) || !productId) {
+        return res.status(400).json({ success: false, message: 'Valid store platform and product id are required.' });
+    }
+    const { COIN_PACKAGES } = require('../config/monetization');
+    const coinPackage = COIN_PACKAGES.find((item) =>
+        (platform === 'android' ? item.androidProductId : item.iosProductId) === productId
+    );
+    if (!coinPackage) return res.status(400).json({ success: false, message: 'Unknown coin store product.' });
+
+    try {
+        const { verifyStorePurchase } = require('../services/storePurchaseVerificationService');
+        const verified = await verifyStorePurchase({ platform, productId, purchaseId, verificationData });
+        const StorePurchase = require('../models/StorePurchase');
+
+        const wallet = await runFinancialTransaction(async (session) => {
+            const duplicateQuery = verified.purchaseToken
+                ? { platform, purchaseToken: verified.purchaseToken }
+                : { platform, transactionId: verified.transactionId };
+            const existing = await StorePurchase.findOne(duplicateQuery).session(session);
+            if (existing) {
+                if (String(existing.user) !== String(req.user.id)) throw new Error('This store purchase was already used by another account.');
+                return getOrCreateWallet(req.user.id, session);
+            }
+
+            const record = await StorePurchase.create([{
+                user: req.user.id,
+                platform,
+                productId,
+                packageId: coinPackage.id,
+                coins: coinPackage.coins,
+                transactionId: verified.transactionId || undefined,
+                purchaseToken: verified.purchaseToken || undefined,
+                status: 'verified',
+                storePayload: verified.payload,
+                processedAt: new Date(),
+            }], { session });
+
+            return changeCoins({
+                user: req.user.id,
+                delta: coinPackage.coins,
+                transactionType: 'coin_purchase',
+                referenceType: 'store_purchase',
+                referenceId: record[0]._id,
+                metadata: { platform, productId, packageId: coinPackage.id, transactionId: verified.transactionId },
+                session,
+            });
+        });
+        return res.json({ success: true, data: wallet });
+    } catch (err) {
+        console.error('Store coin verification failed:', err?.response?.data || err.message);
+        return res.status(400).json({ success: false, message: err.message || 'Store purchase could not be verified.' });
     }
 };
 

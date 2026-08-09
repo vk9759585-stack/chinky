@@ -35,6 +35,27 @@ async function changeCoins({ user, delta, transactionType, referenceType, refere
   return wallet;
 }
 
+async function creditRewardCoins({ user, coins, transactionType, referenceType, referenceId, metadata = {}, session }) {
+  if (!Number.isInteger(coins) || coins <= 0) throw new Error('Reward credit must be a positive integer');
+  const wallet = await getOrCreateWallet(user, session);
+  const before = wallet.coins;
+  wallet.coins += coins;
+  wallet.totalRewardCoins = (wallet.totalRewardCoins || 0) + coins;
+  wallet.totalEarned = (wallet.totalEarned || 0) + coins;
+  await wallet.save({ session });
+  await WalletLedger.create([{
+    user,
+    transactionType,
+    coinDelta: coins,
+    balanceBefore: before,
+    balanceAfter: wallet.coins,
+    referenceType,
+    referenceId: String(referenceId),
+    metadata,
+  }], { session });
+  return wallet;
+}
+
 async function creditCreatorEarnings({ user, coins, transactionType, referenceType, referenceId, metadata = {}, session }) {
   if (!Number.isInteger(coins) || coins <= 0) throw new Error('Creator credit must be a positive integer');
   const wallet = await getOrCreateWallet(user, session);
@@ -66,4 +87,4 @@ async function runFinancialTransaction(work) {
   }
 }
 
-module.exports = { getOrCreateWallet, changeCoins, creditCreatorEarnings, runFinancialTransaction };
+module.exports = { getOrCreateWallet, changeCoins, creditRewardCoins, creditCreatorEarnings, runFinancialTransaction };

@@ -25,6 +25,8 @@ const walletSchema = new mongoose.Schema(
 
         totalCoinsSpent: { type: Number, default: 0, min: 0 },
 
+        totalRewardCoins: { type: Number, default: 0, min: 0 },
+
         pendingEarningsPaise: { type: Number, default: 0, min: 0 },
 
         availableEarningsPaise: { type: Number, default: 0, min: 0 },

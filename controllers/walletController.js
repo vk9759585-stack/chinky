@@ -1,5 +1,6 @@
 const Wallet = require("../models/Wallet");
-const { COIN_PACKAGES } = require('../config/monetization');
+const WalletLedger = require('../models/WalletLedger');
+const { COIN_PACKAGES, GIFT_CATALOG, COIN_VALUE_PAISE } = require('../config/monetization');
 const { getOrCreateWallet } = require('../services/walletAccountingService');
 
 // ======================================
@@ -79,5 +80,34 @@ exports.removeCoins = async (req, res) => {
 
 exports.getCoinPackages = (_, res) => res.json({
     success: true,
-    data: COIN_PACKAGES.map(({ id, amountPaise, coins }) => ({ id, amountPaise, coins })),
+    data: COIN_PACKAGES.map(({ id, amountPaise, coins, androidProductId, iosProductId }) => ({ id, amountPaise, coins, androidProductId, iosProductId })),
 });
+
+exports.getGiftCatalog = (_, res) => res.json({ success: true, data: { coinValuePaise: COIN_VALUE_PAISE, gifts: GIFT_CATALOG } });
+
+
+// ======================================
+// REAL WALLET ACTIVITY
+// ======================================
+exports.getActivity = async (req, res) => {
+    try {
+        const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
+        const items = await WalletLedger.find({ user: req.user.id })
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .lean();
+        return res.json({
+            success: true,
+            data: items.map((item) => ({
+                id: String(item._id),
+                type: item.transactionType,
+                coinDelta: item.coinDelta || 0,
+                earningDeltaPaise: item.earningDeltaPaise || 0,
+                createdAt: item.createdAt,
+                metadata: item.metadata || {},
+            })),
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: 'Wallet activity could not be loaded.' });
+    }
+};

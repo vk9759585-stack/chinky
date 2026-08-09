@@ -4,7 +4,7 @@ const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
 const Wallet = require("../models/Wallet");
 const Gift = require("../models/Gift");
-const { SPARK_GIFT_MIN_FOLLOWERS, splitCoins } = require('../config/monetization');
+const { SPARK_GIFT_MIN_FOLLOWERS, splitCoins, getGift } = require('../config/monetization');
 const { changeCoins, creditCreatorEarnings, runFinancialTransaction } = require('../services/walletAccountingService');
 
 const sparkThumbnail = (upload) => {
@@ -280,15 +280,8 @@ exports.reportSpark = async (req, res) => {
 
 exports.sendGift = async (req, res) => {
     try {
-        const packs = {
-            Sawan: 10, "Hurts Me": 99, "Sawan Food": 299, Peachy: 439,
-            "Jhula Bloom": 599, Sindoor: 999, "Monsoon Love": 4999,
-            "Gold Rose": 9999, "Mor Crown": 99, "Big Kiss": 199,
-            "Wedding Mala": 139, "Love U": 399, "Pappi Jodi": 1899,
-            "Timeless Love": 39999, "Eternal Love": 99999,
-            "Rose Wedding": 139999,
-        };
-        const cost = packs[req.body.giftName];
+        const selectedGift = getGift(req.body.giftName);
+        const cost = selectedGift?.coins;
         if (!cost) return res.status(400).json({ success: false, message: "Invalid gift" });
         const spark = await Spark.findById(req.params.id).populate("user", "followers");
         if (!spark) return res.status(404).json({ success: false, message: "Spark not found" });
