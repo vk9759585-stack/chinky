@@ -112,6 +112,8 @@ app.use("/api/vibes-seen", require("./routes/vibesSeenRoutes"));
 
 // LIVE STREAMING (ZEGOCLOUD room tokens)
 app.use("/api/live", require("./routes/liveRoutes"));
+app.use("/api/app", require("./routes/appRoutes"));
+app.use("/api/legal", require("./routes/legalRoutes"));
 
 // CHAT
 app.use("/api/chat", require("./routes/chatRoutes"));

@@ -1,4 +1,10 @@
 const crypto = require("crypto");
+const mongoose = require('mongoose');
+const LiveSession = require('../models/LiveSession');
+const User = require('../models/User');
+const Gift = require('../models/Gift');
+const { getGift, splitCoins } = require('../config/monetization');
+const { changeCoins, creditCreatorEarnings, runFinancialTransaction } = require('../services/walletAccountingService');
 
 const token04 = (appID, userID, serverSecret, effectiveSeconds, payload = "") => {
   const now = Math.floor(Date.now() / 1000);
@@ -14,10 +20,7 @@ const token04 = (appID, userID, serverSecret, effectiveSeconds, payload = "") =>
   const secret = Buffer.from(serverSecret, "utf8");
   const algorithm = `aes-${secret.length * 8}-cbc`;
   const cipher = crypto.createCipheriv(algorithm, secret, iv);
-  const encrypted = Buffer.concat([
-    cipher.update(JSON.stringify(tokenInfo), "utf8"),
-    cipher.final(),
-  ]);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(tokenInfo), "utf8"), cipher.final()]);
   const expire = Buffer.alloc(8);
   expire.writeBigInt64BE(BigInt(tokenInfo.expire));
   const ivLength = Buffer.alloc(2);
@@ -27,25 +30,150 @@ const token04 = (appID, userID, serverSecret, effectiveSeconds, payload = "") =>
   return `04${Buffer.concat([expire, ivLength, Buffer.from(iv), encryptedLength, encrypted]).toString("base64")}`;
 };
 
+const serialize = (session) => ({
+  liveID: session.liveID,
+  hostUserId: String(session.hostUserId?._id || session.hostUserId || ''),
+  hostName: session.hostName || session.hostUserId?.name || session.hostUserId?.username || 'Chinky creator',
+  hostUsername: session.hostUserId?.username || '',
+  hostProfileImage: session.hostUserId?.profileImage || '',
+  startedAt: session.startedAt,
+  endedAt: session.endedAt,
+  isLive: session.isLive === true,
+});
+
 exports.createZegoToken = (req, res) => {
   const appID = Number(process.env.ZEGO_APP_ID);
   const serverSecret = process.env.ZEGO_SERVER_SECRET || "";
   const liveID = String(req.body.liveID || "").trim();
-  if (!appID || !serverSecret) {
-    return res.status(503).json({ success: false, message: "ZEGOCLOUD is not configured on the server." });
-  }
-  if (!/^[A-Za-z0-9_-]{1,128}$/.test(liveID)) {
-    return res.status(400).json({ success: false, message: "Invalid live room ID." });
-  }
-  if (![16, 24, 32].includes(Buffer.byteLength(serverSecret))) {
-    return res.status(500).json({ success: false, message: "Invalid ZEGOCLOUD server secret." });
-  }
+  if (!appID || !serverSecret) return res.status(503).json({ success: false, message: "ZEGOCLOUD is not configured on the server." });
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(liveID)) return res.status(400).json({ success: false, message: "Invalid live room ID." });
+  if (![16, 24, 32].includes(Buffer.byteLength(serverSecret))) return res.status(500).json({ success: false, message: "Invalid ZEGOCLOUD server secret." });
   try {
     const userID = String(req.user.id).replace(/[^A-Za-z0-9_]/g, "_");
     const payload = JSON.stringify({ room_id: liveID, privilege: { 1: 1, 2: 1 }, stream_id_list: null });
     const token = token04(appID, userID, serverSecret, 3600, payload);
     return res.json({ success: true, appID, userID, liveID, token, expiresIn: 3600 });
-  } catch (error) {
+  } catch (_) {
     return res.status(500).json({ success: false, message: "Could not create live token." });
+  }
+};
+
+exports.startSession = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('name username profileImage');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    await LiveSession.updateMany(
+      { hostUserId: user._id, isLive: true },
+      { $set: { isLive: false, endedAt: new Date() } },
+    );
+
+    const liveID = `chinky_${String(user._id).replace(/[^A-Za-z0-9]/g, '')}_${Date.now()}`;
+    const session = await LiveSession.create({
+      liveID,
+      hostUserId: user._id,
+      hostName: user.name || user.username || 'Chinky creator',
+      startedAt: new Date(),
+      isLive: true,
+    });
+    await session.populate('hostUserId', 'name username profileImage');
+    return res.status(201).json({ success: true, data: serialize(session) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getSession = async (req, res) => {
+  try {
+    const session = await LiveSession.findOne({ liveID: req.params.liveID }).populate('hostUserId', 'name username profileImage');
+    if (!session) return res.status(404).json({ success: false, message: 'Live session not found' });
+    return res.json({ success: true, data: serialize(session) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.activeForUser = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.userId)) return res.json({ success: true, data: null });
+    const session = await LiveSession.findOne({ hostUserId: req.params.userId, isLive: true })
+      .sort({ startedAt: -1 })
+      .populate('hostUserId', 'name username profileImage');
+    return res.json({ success: true, data: session ? serialize(session) : null });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.activeSessions = async (req, res) => {
+  try {
+    const ids = String(req.query.userIds || '').split(',').map((v) => v.trim()).filter((v) => mongoose.isValidObjectId(v)).slice(0, 100);
+    const query = { isLive: true };
+    if (ids.length) query.hostUserId = { $in: ids };
+    const sessions = await LiveSession.find(query).sort({ startedAt: -1 }).limit(100).populate('hostUserId', 'name username profileImage');
+    return res.json({ success: true, data: sessions.map(serialize) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.endSession = async (req, res) => {
+  try {
+    const session = await LiveSession.findOne({ liveID: req.params.liveID });
+    if (!session) return res.json({ success: true });
+    if (String(session.hostUserId) !== String(req.user.id)) return res.status(403).json({ success: false, message: 'Only the host can end this live.' });
+    session.isLive = false;
+    session.endedAt = new Date();
+    await session.save();
+    return res.json({ success: true, data: serialize(session) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.sendGift = async (req, res) => {
+  try {
+    const sessionDoc = await LiveSession.findOne({ liveID: req.params.liveID, isLive: true });
+    if (!sessionDoc) return res.status(404).json({ success: false, message: 'Live is no longer active.' });
+    if (String(sessionDoc.hostUserId) === String(req.user.id)) return res.status(400).json({ success: false, message: 'You cannot gift yourself.' });
+    const selectedGift = getGift(req.body.giftName);
+    if (!selectedGift) return res.status(400).json({ success: false, message: 'Invalid gift' });
+    const { creatorCoins, platformCoins } = splitCoins(selectedGift.coins);
+    const result = await runFinancialTransaction(async (dbSession) => {
+      const created = await Gift.create([{
+        sender: req.user.id,
+        receiver: sessionDoc.hostUserId,
+        giftName: selectedGift.name,
+        coins: selectedGift.coins,
+        sourceType: 'live',
+        sourceId: sessionDoc.liveID,
+        creatorShareCoins: creatorCoins,
+        platformShareCoins: platformCoins,
+      }], { session: dbSession });
+      const gift = created[0];
+      const senderWallet = await changeCoins({
+        user: req.user.id,
+        delta: -selectedGift.coins,
+        transactionType: 'live_gift_sent',
+        referenceType: 'gift',
+        referenceId: gift._id,
+        metadata: { liveID: sessionDoc.liveID, giftName: selectedGift.name },
+        session: dbSession,
+      });
+      await creditCreatorEarnings({
+        user: sessionDoc.hostUserId,
+        coins: creatorCoins,
+        transactionType: 'live_gift_received',
+        referenceType: 'gift',
+        referenceId: gift._id,
+        metadata: { liveID: sessionDoc.liveID, giftName: selectedGift.name },
+        session: dbSession,
+      });
+      return { senderWallet, gift };
+    });
+    return res.json({ success: true, coins: result.senderWallet.coins, gift: { id: result.gift._id, name: result.gift.giftName, coins: result.gift.coins } });
+  } catch (error) {
+    const status = String(error.message || '').includes('Insufficient') ? 400 : 500;
+    return res.status(status).json({ success: false, message: error.message });
   }
 };

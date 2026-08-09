@@ -16,7 +16,7 @@ exports.getCoinCheckoutConfig = (_, res) => res.json({
     key: process.env.RAZORPAY_KEY || null,
     enabled: Boolean(razorpay && process.env.RAZORPAY_KEY),
     upiEnabled: Boolean(razorpay && process.env.RAZORPAY_KEY),
-    purchaseCoinsPerRupee: require('../config/monetization').PURCHASE_COINS_PER_RUPEE,
+    purchaseCoinsPer10Rupees: require('../config/monetization').PURCHASE_COINS_PER_10_RUPEES,
     minimumPurchasePaise: require('../config/monetization').MINIMUM_PURCHASE_PAISE,
 });
 

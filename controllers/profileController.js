@@ -60,9 +60,10 @@ const contentPopulate = {
 exports.getProfile = async (req, res) => {
     try {
         const userId = (req.user.id || req.user._id || req.user.userId).toString();
-        const [user, posts] = await Promise.all([
+        const [user, postCount, sparkCount] = await Promise.all([
             User.findById(userId).select("-password"),
-            Post.countDocuments({ user: userId })
+            Post.countDocuments({ user: userId }),
+            Spark.countDocuments({ user: userId })
         ]);
 
         if (!user) {
@@ -73,7 +74,9 @@ exports.getProfile = async (req, res) => {
         }
 
         const data = user.toObject();
-        data.posts = posts;
+        data.postCount = postCount;
+        data.sparkCount = sparkCount;
+        data.posts = postCount + sparkCount;
         data.followersCount = Array.isArray(data.followers) ? data.followers.length : 0;
         data.followingCount = Array.isArray(data.following) ? data.following.length : 0;
 

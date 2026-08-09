@@ -14,6 +14,12 @@ exports.startCall = async (req, res) => {
             createdAt: new Date()
         });
 
+        const io = req.app.get("io");
+        if (io) {
+            const incoming = await Call.findById(call._id).populate("caller", "name username profileImage");
+            io.to(`user:${req.body.receiverId}`).emit("call:incoming", incoming.toObject());
+        }
+
         return res.status(201).json({
             success: true,
             message: "Call started successfully",
@@ -51,6 +57,9 @@ exports.acceptCall = async (req, res) => {
             });
         }
 
+        const io = req.app.get("io");
+        if (io) io.to(`user:${call.caller}`).emit("call:accepted", call.toObject());
+
         return res.json({
             success: true,
             data: call
@@ -78,6 +87,9 @@ exports.rejectCall = async (req, res) => {
                 new: true
             }
         );
+
+        const io = req.app.get("io");
+        if (io && call) io.to(`user:${call.caller}`).emit("call:rejected", call.toObject());
 
         return res.json({
             success: true,
@@ -116,6 +128,12 @@ exports.endCall = async (req, res) => {
         }
 
         await call.save();
+
+        const io = req.app.get("io");
+        if (io) {
+            io.to(`user:${call.caller}`).emit("call:ended", call.toObject());
+            io.to(`user:${call.receiver}`).emit("call:ended", call.toObject());
+        }
 
         return res.json({
             success: true,

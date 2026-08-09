@@ -4,11 +4,14 @@ const PLATFORM_GIFT_SHARE_BPS = 3000;
 const SPARK_GIFT_MIN_FOLLOWERS = 0;
 
 // Final requested rates.
-const PURCHASE_COINS_PER_RUPEE = 17;      // ₹1 = 17 purchase coins
-const WITHDRAW_COINS_PER_RUPEE = 25;      // 25 earned coins = ₹1
-const PURCHASE_TO_WITHDRAW_MARGIN_PERCENT = Math.round((1 - PURCHASE_COINS_PER_RUPEE / WITHDRAW_COINS_PER_RUPEE) * 100); // 32%
+const PURCHASE_COINS_PER_10_RUPEES = 17; // ₹10 = 17 purchase coins
+const WITHDRAW_DIAMONDS_PER_10_RUPEES = 25; // 25 diamonds = ₹10
+// Legacy numeric fields remain for older clients only; UI must not show internal margins.
+const PURCHASE_COINS_PER_RUPEE = PURCHASE_COINS_PER_10_RUPEES / 10;
+const WITHDRAW_COINS_PER_RUPEE = WITHDRAW_DIAMONDS_PER_10_RUPEES / 10;
+const PURCHASE_TO_WITHDRAW_MARGIN_PERCENT = 0;
 const MINIMUM_PURCHASE_PAISE = 2000;      // ₹20
-const MINIMUM_WITHDRAWAL_COINS = 500;      // ₹20 at 25 coins/₹
+const MINIMUM_WITHDRAWAL_COINS = 50;      // 50 diamonds = ₹20
 const DAILY_CHECKIN_REWARDS = Object.freeze([1, 2, 3, 4, 5, 7, 10]);
 
 const GIFT_CATALOG = Object.freeze([
@@ -28,7 +31,7 @@ const GIFT_CATALOG = Object.freeze([
 const getGift = (name) => GIFT_CATALOG.find((item) => item.name === name);
 
 const packageFor = (rupees, discountPercent = 0) => {
-  const baseCoins = rupees * PURCHASE_COINS_PER_RUPEE;
+  const baseCoins = Math.floor((rupees * PURCHASE_COINS_PER_10_RUPEES) / 10);
   const bonusCoins = Math.floor((baseCoins * discountPercent) / 100);
   return Object.freeze({
     id: `coins_${rupees}`,
@@ -53,11 +56,11 @@ const COIN_PACKAGES = Object.freeze([
 ]);
 const getCoinPackage = (id) => COIN_PACKAGES.find((item) => item.id === id);
 const splitCoins = (coins) => { const creatorCoins = Math.floor((coins * CREATOR_GIFT_SHARE_BPS) / 10000); return { creatorCoins, platformCoins: coins - creatorCoins }; };
-const withdrawCoinsToPaise = (coins) => Math.floor((coins * 100) / WITHDRAW_COINS_PER_RUPEE);
+const withdrawCoinsToPaise = (diamonds) => Math.floor(diamonds / WITHDRAW_DIAMONDS_PER_10_RUPEES) * 1000;
 
 module.exports = {
   CREATOR_GIFT_SHARE_BPS, PLATFORM_GIFT_SHARE_BPS, SPARK_GIFT_MIN_FOLLOWERS,
-  PURCHASE_COINS_PER_RUPEE, WITHDRAW_COINS_PER_RUPEE, PURCHASE_TO_WITHDRAW_MARGIN_PERCENT,
+  PURCHASE_COINS_PER_10_RUPEES, WITHDRAW_DIAMONDS_PER_10_RUPEES, PURCHASE_COINS_PER_RUPEE, WITHDRAW_COINS_PER_RUPEE, PURCHASE_TO_WITHDRAW_MARGIN_PERCENT,
   MINIMUM_PURCHASE_PAISE, MINIMUM_WITHDRAWAL_COINS, DAILY_CHECKIN_REWARDS,
   COIN_PACKAGES, GIFT_CATALOG, getGift, getCoinPackage, splitCoins, withdrawCoinsToPaise,
 };

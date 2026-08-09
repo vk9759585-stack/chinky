@@ -129,6 +129,11 @@ router.delete(
 router.delete("/:id", auth, controller.deleteForMe);
 
 // ====================================
+// PRESENCE
+// ====================================
+router.get("/presence/:userId", auth, controller.getPresence);
+
+// ====================================
 // GET CHAT
 // ====================================
 

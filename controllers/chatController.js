@@ -1,6 +1,7 @@
 const Chat = require("../models/Chat");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
+const { getSockets } = require("../socket/users");
 
 // ====================================
 // UPLOAD CHAT ATTACHMENT
@@ -62,6 +63,8 @@ exports.sendMessage = async (req, res) => {
 
         } = req.body;
 
+        const receiverOnline = getSockets(receiverId).size > 0;
+
         const chat = await Chat.create({
 
             sender: req.user.id,
@@ -71,6 +74,8 @@ exports.sendMessage = async (req, res) => {
             message: message || "",
 
             type: type || "text",
+
+            delivered: receiverOnline,
 
             replyTo: replyTo || null,
 
@@ -91,6 +96,11 @@ exports.sendMessage = async (req, res) => {
             .populate("receiver", "name username profileImage")
 
             .populate("replyTo");
+
+        const io = req.app.get("io");
+        if (io) {
+            io.to(`user:${receiverId}`).emit("message:new", result.toObject());
+        }
 
         res.status(201).json({
 
@@ -129,6 +139,13 @@ exports.getMessages = async (req, res) => {
         const limit = Number(req.query.limit) || 30;
 
         const skip = (page - 1) * limit;
+
+        await Chat.updateMany(
+            { sender: req.params.userId, receiver: req.user.id, seen: false },
+            { $set: { delivered: true, seen: true, seenAt: new Date() } }
+        );
+        const io = req.app.get("io");
+        if (io) io.to(`user:${req.params.userId}`).emit("chat:seen", { by: req.user.id });
 
         const chats = await Chat.find({
 
@@ -204,6 +221,14 @@ exports.getMessages = async (req, res) => {
 };
 
 // ====================================
+// PRESENCE
+// ====================================
+exports.getPresence = async (req, res) => {
+    const sockets = getSockets(req.params.userId);
+    return res.json({ success: true, online: sockets.size > 0 });
+};
+
+// ====================================
 // MARK MESSAGE AS SEEN
 // ====================================
 
@@ -232,6 +257,9 @@ exports.markSeen = async (req, res) => {
             }
 
         );
+
+        const io = req.app.get("io");
+        if (io && chat) io.to(`user:${chat.sender}`).emit("chat:seen", { messageId: chat._id, by: req.user.id });
 
         res.json({
 
