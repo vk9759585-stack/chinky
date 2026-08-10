@@ -9,6 +9,10 @@ Production API for Chinky mobile/web clients.
 3. Fill required values in .env: MONGO_URI and JWT_SECRET
 4. Run in development: npm run dev
 
+The same server also hosts the website from `../website`. After startup, open
+`http://127.0.0.1:5000`; API routes remain available under `/api`, website
+session routes under `/auth`, and website dashboard routes under `/web`.
+
 ## Scripts
 
 - npm start: Start server in normal mode.
@@ -60,3 +64,4 @@ CI workflow:
 
 - Payment APIs degrade gracefully if Razorpay keys are absent (return 503 instead of crashing app startup).
 - CORS in production is controlled by FRONTEND_ORIGINS (comma-separated).
+- Website and backend deploy together; do not deploy `website/` as a separate service.

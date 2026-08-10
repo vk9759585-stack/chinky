@@ -17,7 +17,8 @@ Set these in Render service environment:
 - PORT=10000 (Render sets this automatically, keep code fallback intact)
 - MONGO_URI=your_mongo_connection_string
 - JWT_SECRET=your_strong_random_secret
-- FRONTEND_ORIGINS=`https://your-frontend-domain.com,https://www.your-frontend-domain.com`
+- FRONTEND_ORIGINS is optional for the bundled same-origin website. Set it only
+  when an additional browser client is hosted on another origin.
 
 ## 3. Optional Integrations (Set only if feature is used)
 
@@ -41,16 +42,18 @@ Set these in Render service environment:
 
 Run these checks after deploy:
 
-1. GET / should return API metadata JSON.
-2. GET /health should return 200 when DB is connected.
-3. GET /health/config should show core booleans true:
+1. GET / should return the CHINKY website HTML.
+2. GET /api should return API metadata JSON.
+3. GET /health should return 200 when DB is connected.
+4. GET /health/config should show core booleans true:
    - MONGO_URI
    - JWT_SECRET
    - dbConnected
-4. Login flow works.
-5. Feed endpoint works.
-6. Follow and like actions work.
-7. Payment endpoints return:
+5. Website login creates the `chinky_session` HttpOnly cookie.
+6. Website Profile, Flow, Sparks, and Messages dashboard sections load.
+7. Feed endpoint works.
+8. Follow and like actions work.
+9. Payment endpoints return:
    - normal responses when Razorpay is configured
    - 503 when Razorpay is intentionally not configured
 

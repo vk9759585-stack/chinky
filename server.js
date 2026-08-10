@@ -1,4 +1,5 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const express = require("express");
 const cors = require("cors");
@@ -11,6 +12,7 @@ const connectDB = require("./config/db");
 
 // Initialize app
 const app = express();
+const websiteRoot = path.resolve(__dirname, "..", "website");
 
 const isNonEmpty = (value) => typeof value === "string" && value.trim().length > 0;
 const isProd = process.env.NODE_ENV === "production";
@@ -61,6 +63,17 @@ if (missingCore.length) {
 // =====================
 // MIDDLEWARE
 // =====================
+app.disable("x-powered-by");
+if (isProd) app.set("trust proxy", 1);
+app.use((req, res, next) => {
+  res.set("X-Content-Type-Options", "nosniff");
+  res.set("X-Frame-Options", "DENY");
+  res.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: https:; media-src 'self' https: blob:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'");
+  if (isProd) res.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  next();
+});
 app.use(cors({
   ...corsOptions,
 }));
@@ -75,8 +88,9 @@ app.use("/api", (req, res, next) => {
 });
 app.use(express.urlencoded({ extended: true }));
 
-// Static folder
-app.use("/uploads", express.static("uploads"));
+// Uploaded media always resolves from the backend directory, regardless of
+// whether the process is launched from the repository root or /backend.
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // =====================
 // DATABASE
@@ -86,6 +100,10 @@ connectDB();
 // =====================
 // ROUTES
 // =====================
+
+// Website authentication and dashboard routes use the same database and
+// controllers as the mobile API. No second proxy/server is involved.
+app.use(require("./routes/webRoutes"));
 
 // Media
 app.use("/api/media", require("./routes/mediaRoutes"));
@@ -156,7 +174,7 @@ app.use("/api/support", require("./routes/supportRoutes"));
 // =====================
 // HEALTH CHECK
 // =====================
-app.get("/", (req, res) => {
+app.get("/api", (req, res) => {
   res.json({
     success: true,
     app: "Chinky API",
@@ -185,6 +203,24 @@ app.get("/health/config", (req, res) => {
     },
     integrations: optionalIntegrations,
   });
+});
+
+// The backend and website are delivered from one origin and one process.
+// Only public browser assets are exposed; server launchers and local data are
+// deliberately excluded from static serving.
+app.use("/assets", express.static(path.join(websiteRoot, "assets"), {
+  dotfiles: "deny",
+  maxAge: isProd ? "1h" : 0,
+}));
+
+app.get(["/styles.css", "/app.js"], (req, res) => {
+  res.set("Cache-Control", isProd ? "public, max-age=3600" : "no-cache");
+  return res.sendFile(path.join(websiteRoot, req.path.slice(1)));
+});
+
+app.get("/", (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  return res.sendFile(path.join(websiteRoot, "index.html"));
 });
 
 // =====================
