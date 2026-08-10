@@ -1,7 +1,7 @@
 const razorpay = require("../config/razorpay");
 const crypto = require('crypto');
 const Payment = require('../models/Payment');
-const { getCoinPackage } = require('../config/monetization');
+const { getCoinPackage, quoteCustomCoins, CUSTOM_COIN_MIN, CUSTOM_COIN_MAX } = require('../config/monetization');
 const { changeCoins, getOrCreateWallet, runFinancialTransaction } = require('../services/walletAccountingService');
 
 const paymentUnavailable = (res) => {
@@ -16,20 +16,39 @@ exports.getCoinCheckoutConfig = (_, res) => res.json({
     key: process.env.RAZORPAY_KEY || null,
     enabled: Boolean(razorpay && process.env.RAZORPAY_KEY),
     upiEnabled: Boolean(razorpay && process.env.RAZORPAY_KEY),
+    cardsEnabled: Boolean(razorpay && process.env.RAZORPAY_KEY),
+    alternativeBillingEnabled: String(process.env.ALTERNATIVE_BILLING_ENABLED || '').toLowerCase() === 'true',
+    checkoutConfigId: process.env.RAZORPAY_CHECKOUT_CONFIG_ID || null,
+    customCoinMin: CUSTOM_COIN_MIN,
+    customCoinMax: CUSTOM_COIN_MAX,
     purchaseCoinsPer10Rupees: require('../config/monetization').PURCHASE_COINS_PER_10_RUPEES,
     minimumPurchasePaise: require('../config/monetization').MINIMUM_PURCHASE_PAISE,
 });
 
+exports.quoteCustomCoinPurchase = (req, res) => {
+    const quote = quoteCustomCoins(req.query.coins);
+    if (!quote) return res.status(400).json({ success: false, message: `Enter ${CUSTOM_COIN_MIN}-${CUSTOM_COIN_MAX} coins.` });
+    return res.json({ success: true, data: quote });
+};
+
 exports.createCoinOrder = async (req, res) => {
     if (!razorpay) return paymentUnavailable(res);
     try {
-        const coinPackage = getCoinPackage(String(req.body.packageId || ''));
-        if (!coinPackage) return res.status(400).json({ success: false, message: 'Invalid coin package.' });
+        const requestedPackageId = String(req.body.packageId || '');
+        const customCoins = req.body.customCoins;
+        const coinPackage = requestedPackageId ? getCoinPackage(requestedPackageId) : quoteCustomCoins(customCoins);
+        if (!coinPackage) return res.status(400).json({ success: false, message: 'Invalid coin package or custom coin amount.' });
+
         const order = await razorpay.orders.create({
             amount: coinPackage.amountPaise,
             currency: 'INR',
             receipt: `coins_${req.user.id}_${Date.now()}`.slice(0, 40),
-            notes: { userId: String(req.user.id), packageId: coinPackage.id, channel: 'upi_or_razorpay' },
+            notes: {
+                userId: String(req.user.id),
+                packageId: coinPackage.id,
+                coins: String(coinPackage.coins),
+                channel: 'razorpay_checkout',
+            },
         });
         await Payment.create({
             user: req.user.id,
@@ -43,7 +62,13 @@ exports.createCoinOrder = async (req, res) => {
         });
         return res.status(201).json({
             success: true,
-            data: { orderId: order.id, amountPaise: coinPackage.amountPaise, currency: 'INR', packageId: coinPackage.id },
+            data: {
+                orderId: order.id,
+                amountPaise: coinPackage.amountPaise,
+                currency: 'INR',
+                packageId: coinPackage.id,
+                coins: coinPackage.coins,
+            },
         });
     } catch (err) {
         return res.status(500).json({ success: false, message: 'Could not create coin payment order.' });
@@ -67,6 +92,27 @@ exports.verifyCoinPayment = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid payment signature.' });
     }
     try {
+        const paymentRecord = await Payment.findOne({ user: req.user.id, orderId });
+        if (!paymentRecord || paymentRecord.purpose !== 'coins') {
+            return res.status(404).json({ success: false, message: 'Payment order not found.' });
+        }
+
+        // Do not rely only on the client success callback. Fetch the payment
+        // from Razorpay and validate order, amount, currency and capture state.
+        let gatewayPayment = await razorpay.payments.fetch(paymentId);
+        if (!gatewayPayment || gatewayPayment.order_id !== orderId) {
+            return res.status(400).json({ success: false, message: 'Gateway order mismatch.' });
+        }
+        if (Number(gatewayPayment.amount) !== Number(paymentRecord.amount) || gatewayPayment.currency !== 'INR') {
+            return res.status(400).json({ success: false, message: 'Gateway amount mismatch.' });
+        }
+        if (gatewayPayment.status === 'authorized') {
+            gatewayPayment = await razorpay.payments.capture(paymentId, paymentRecord.amount, 'INR');
+        }
+        if (gatewayPayment.status !== 'captured') {
+            return res.status(409).json({ success: false, message: 'Payment has not been captured yet.' });
+        }
+
         const wallet = await runFinancialTransaction(async (session) => {
             const payment = await Payment.findOne({ user: req.user.id, orderId }).session(session);
             if (!payment || payment.purpose !== 'coins') throw new Error('Payment order not found');
