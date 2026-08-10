@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const express = require("express");
@@ -72,6 +73,12 @@ if (missingCore.length) {
 // =====================
 app.disable("x-powered-by");
 if (isProd) app.set("trust proxy", 1);
+app.use((req, res, next) => {
+  if (isProd && req.hostname.toLowerCase() === "www.chinkyapp.com") {
+    return res.redirect(308, `https://chinkyapp.com${req.originalUrl}`);
+  }
+  next();
+});
 app.use((req, res, next) => {
   res.set("X-Content-Type-Options", "nosniff");
   res.set("X-Frame-Options", "DENY");
@@ -229,21 +236,149 @@ app.get(["/styles.css", "/app.js", "/robots.txt", "/sitemap.xml"], (req, res) =>
 app.get("/.well-known/assetlinks.json", (_req, res) => {
   res.set("Cache-Control", isProd ? "public, max-age=3600" : "no-cache");
   res.type("application/json");
-  return res.sendFile(path.join(websiteRoot, ".well-known", "assetlinks.json"));
+  return res.sendFile(
+    path.join(websiteRoot, ".well-known", "assetlinks.json"),
+    { dotfiles: "allow" },
+  );
 });
 
 const publicDocuments = Object.freeze({
-  "/privacy-policy": "privacy-policy.md",
-  "/terms-of-service": "terms-of-service.md",
-  "/delete-account": "delete-account.md",
-  "/child-safety": "csae-policy.md",
-  "/audio-policy": "audio-policy.md",
+  "/privacy-policy": {
+    file: "privacy-policy.md",
+    title: "Privacy Policy",
+    description: "How CHINKY collects, uses, and protects account information.",
+  },
+  "/terms-of-service": {
+    file: "terms-of-service.md",
+    title: "Terms of Service",
+    description: "The terms that apply when you create an account or use CHINKY.",
+  },
+  "/delete-account": {
+    file: "delete-account.md",
+    title: "Delete Your Account",
+    description: "How to request deletion of your CHINKY account and associated data.",
+  },
+  "/child-safety": {
+    file: "csae-policy.md",
+    title: "Child Safety Standards",
+    description: "CHINKY standards against child sexual abuse and exploitation.",
+  },
+  "/audio-policy": {
+    file: "audio-policy.md",
+    title: "Audio Policy",
+    description: "Rules for uploading, saving, and reusing audio on CHINKY.",
+  },
 });
 
-app.get(Object.keys(publicDocuments), (req, res) => {
-  res.set("Cache-Control", isProd ? "public, max-age=3600" : "no-cache");
-  res.type("text/plain; charset=utf-8");
-  return res.sendFile(path.join(__dirname, publicDocuments[req.path]));
+const escapeHtml = (value) => String(value)
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#039;");
+
+const renderInlineDocumentText = (value) => escapeHtml(value).replace(
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
+  (email) => `<a href="mailto:${email}">${email}</a>`,
+);
+
+function renderDocumentMarkdown(markdown) {
+  const html = [];
+  let listOpen = false;
+
+  const closeList = () => {
+    if (!listOpen) return;
+    html.push("</ul>");
+    listOpen = false;
+  };
+
+  for (const rawLine of markdown.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) {
+      closeList();
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      closeList();
+      const level = Math.min(heading[1].length, 3);
+      html.push(`<h${level}>${renderInlineDocumentText(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    if (line.startsWith("- ")) {
+      if (!listOpen) {
+        html.push("<ul>");
+        listOpen = true;
+      }
+      html.push(`<li>${renderInlineDocumentText(line.slice(2))}</li>`);
+      continue;
+    }
+
+    closeList();
+    html.push(`<p>${renderInlineDocumentText(line)}</p>`);
+  }
+
+  closeList();
+  return html.join("\n");
+}
+
+function renderPublicDocumentPage(route, document) {
+  const markdown = fs.readFileSync(path.join(__dirname, document.file), "utf8");
+  const canonicalUrl = `https://chinkyapp.com${route}`;
+  return `<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="${escapeHtml(document.description)}" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#101017" />
+    <link rel="canonical" href="${canonicalUrl}" />
+    <link rel="icon" type="image/png" href="/assets/chinky-logo.png" />
+    <link rel="stylesheet" href="/styles.css" />
+    <title>${escapeHtml(document.title)} | CHINKY</title>
+  </head>
+  <body class="legal-page-body">
+    <a class="skip-link" href="#document">Skip to document</a>
+    <header class="legal-page-header">
+      <div class="container">
+        <a class="brand" href="/" aria-label="CHINKY home">
+          <img src="/assets/chinky-logo.png" alt="" width="44" height="44" />
+          <span>CHINKY</span>
+        </a>
+        <a class="button button--small button--ghost" href="/">Back to home</a>
+      </div>
+    </header>
+    <main class="legal-page-main" id="document">
+      <article class="legal-page-card">
+        <span class="section-kicker">CHINKY policies</span>
+        ${renderDocumentMarkdown(markdown)}
+        <div class="legal-page-help">
+          <strong>Need help?</strong>
+          <span>Contact <a href="mailto:appchinky@gmail.com">appchinky@gmail.com</a></span>
+        </div>
+      </article>
+    </main>
+    <footer class="legal-page-footer">
+      <span>© ${new Date().getFullYear()} CHINKY</span>
+      <a href="/privacy-policy">Privacy</a>
+      <a href="/terms-of-service">Terms</a>
+      <a href="/delete-account">Account deletion</a>
+    </footer>
+  </body>
+</html>`;
+}
+
+app.get(Object.keys(publicDocuments), (req, res, next) => {
+  try {
+    res.set("Cache-Control", isProd ? "public, max-age=3600" : "no-cache");
+    res.type("html");
+    return res.send(renderPublicDocumentPage(req.path, publicDocuments[req.path]));
+  } catch (error) {
+    return next(error);
+  }
 });
 
 app.get("/", (req, res) => {

@@ -5,7 +5,7 @@ Use this before every production deploy.
 ## 1. Build and Start Settings
 
 - Root Directory: backend
-- Build Command: npm install
+- Build Command: npm install && npm run build
 - Start Command: npm start
 - Node Version: keep consistent with local tested version (recommended LTS)
 

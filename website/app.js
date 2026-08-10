@@ -6,15 +6,24 @@ const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)]
 
 function setTheme(theme) {
   root.dataset.theme = theme;
-  localStorage.setItem("chinky-theme", theme);
+  try {
+    localStorage.setItem("chinky-theme", theme);
+  } catch (_) {
+    // The chosen theme still applies when browser storage is unavailable.
+  }
   const toggle = $("[data-theme-toggle]");
   if (toggle) toggle.setAttribute("aria-label", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#101017" : "#f8f8fb");
 }
 
-const savedTheme = localStorage.getItem("chinky-theme");
+let savedTheme = null;
+try {
+  savedTheme = localStorage.getItem("chinky-theme");
+} catch (_) {
+  // Private browsing policies can disable local storage.
+}
 const preferredTheme = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-setTheme(savedTheme || preferredTheme);
+setTheme(["dark", "light"].includes(savedTheme) ? savedTheme : preferredTheme);
 
 $("[data-theme-toggle]")?.addEventListener("click", () => {
   setTheme(root.dataset.theme === "dark" ? "light" : "dark");
@@ -30,6 +39,8 @@ const mobileMenu = $("[data-mobile-menu]");
 
 function closeMenu() {
   menuToggle?.setAttribute("aria-expanded", "false");
+  const label = menuToggle ? $(".sr-only", menuToggle) : null;
+  if (label) label.textContent = "Open menu";
   mobileMenu?.classList.remove("is-open");
   body.classList.remove("menu-open");
 }
@@ -37,6 +48,8 @@ function closeMenu() {
 menuToggle?.addEventListener("click", () => {
   const isOpen = menuToggle.getAttribute("aria-expanded") === "true";
   menuToggle.setAttribute("aria-expanded", String(!isOpen));
+  const label = $(".sr-only", menuToggle);
+  if (label) label.textContent = isOpen ? "Open menu" : "Close menu";
   mobileMenu?.classList.toggle("is-open", !isOpen);
   body.classList.toggle("menu-open", !isOpen);
 });
@@ -72,6 +85,7 @@ function showDemo(name) {
     const selected = tab.dataset.demoTab === name;
     tab.classList.toggle("is-active", selected);
     tab.setAttribute("aria-selected", String(selected));
+    tab.setAttribute("tabindex", selected ? "0" : "-1");
   });
 
   demoPanels.forEach((panel) => {
@@ -81,7 +95,21 @@ function showDemo(name) {
   });
 }
 
-demoTabs.forEach((tab) => tab.addEventListener("click", () => showDemo(tab.dataset.demoTab)));
+demoTabs.forEach((tab, index) => {
+  tab.addEventListener("click", () => showDemo(tab.dataset.demoTab));
+  tab.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    let nextIndex = index;
+    if (event.key === "ArrowLeft") nextIndex = (index - 1 + demoTabs.length) % demoTabs.length;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % demoTabs.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = demoTabs.length - 1;
+    const nextTab = demoTabs[nextIndex];
+    showDemo(nextTab.dataset.demoTab);
+    nextTab.focus();
+  });
+});
 
 const likeButton = $("[data-like-button]");
 const likeIcon = $("[data-like-icon]");
@@ -91,6 +119,7 @@ let liked = false;
 likeButton?.addEventListener("click", () => {
   liked = !liked;
   likeButton.classList.toggle("is-liked", liked);
+  likeButton.setAttribute("aria-pressed", String(liked));
   likeIcon.textContent = liked ? "♥" : "♡";
   likeCount.textContent = liked ? "1,285 likes" : "1,284 likes";
   showToast(liked ? "Added to your likes" : "Removed from your likes");
@@ -106,8 +135,40 @@ sparkPlay?.addEventListener("click", () => {
 const sparkLike = $("[data-spark-like]");
 sparkLike?.addEventListener("click", () => {
   const isLiked = sparkLike.classList.toggle("is-liked");
+  sparkLike.setAttribute("aria-pressed", String(isLiked));
   sparkLike.childNodes[0].nodeValue = isLiked ? "♥" : "♡";
   sparkLike.style.color = isLiked ? "#ff3d7f" : "white";
+});
+
+$('[data-comment-button]')?.addEventListener("click", () => {
+  showToast("Comments are available in the CHINKY app");
+});
+
+$('[data-save-button]')?.addEventListener("click", (event) => {
+  const button = event.currentTarget;
+  const saved = button.getAttribute("aria-pressed") !== "true";
+  button.setAttribute("aria-pressed", String(saved));
+  button.classList.toggle("is-saved", saved);
+  button.textContent = saved ? "▣" : "▢";
+  showToast(saved ? "Saved for later" : "Removed from saved");
+});
+
+$('[data-share-button]')?.addEventListener("click", async () => {
+  const shareData = {
+    title: "CHINKY — Share your spark",
+    text: "Create, share, and connect on CHINKY.",
+    url: "https://chinkyapp.com/",
+  };
+  try {
+    if (navigator.share) {
+      await navigator.share(shareData);
+      return;
+    }
+    await navigator.clipboard.writeText(shareData.url);
+    showToast("Website link copied");
+  } catch (error) {
+    if (error?.name !== "AbortError") showToast("Share https://chinkyapp.com");
+  }
 });
 
 const chatForm = $("[data-chat-form]");
@@ -181,9 +242,10 @@ const legalContent = {
 const legalDialog = $("[data-legal-dialog]");
 const dialogContent = $("[data-dialog-content]");
 
-$$('[data-legal]').forEach((button) => {
-  button.addEventListener("click", () => {
-    dialogContent.innerHTML = legalContent[button.dataset.legal];
+$$('[data-legal]').forEach((link) => {
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    dialogContent.innerHTML = legalContent[link.dataset.legal];
     legalDialog.showModal();
   });
 });
@@ -219,11 +281,14 @@ $("[data-waitlist-form]")?.addEventListener("submit", async (event) => {
   }
   submit.disabled = true;
   submit.textContent = "Joining…";
+  const controller = new AbortController();
+  const requestTimeout = window.setTimeout(() => controller.abort(), 12000);
   try {
     const response = await fetch("/waitlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
+      signal: controller.signal,
       body: JSON.stringify({ email: input.value.trim() }),
     });
     const data = await response.json().catch(() => ({}));
@@ -231,8 +296,11 @@ $("[data-waitlist-form]")?.addEventListener("submit", async (event) => {
     showToast(data.message || "You are on the CHINKY waitlist!");
     form.reset();
   } catch (error) {
-    showToast(error.message || "Could not join the waitlist. Please try again.");
+    showToast(error?.name === "AbortError"
+      ? "The request timed out. Please try again."
+      : (error.message || "Could not join the waitlist. Please try again."));
   } finally {
+    window.clearTimeout(requestTimeout);
     submit.disabled = false;
     submit.innerHTML = "Notify me <span>↗</span>";
   }

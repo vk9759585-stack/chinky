@@ -7,6 +7,8 @@
       name="description"
       content="CHINKY is a social space to share posts, create Sparks, catch up through Vibes, and stay close to your people."
     />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content="#11111a" />
     <link rel="canonical" href="https://chinkyapp.com/" />
     <meta property="og:title" content="CHINKY — Share your spark" />
@@ -27,7 +29,8 @@
     <meta name="twitter:image" content="https://chinkyapp.com/assets/chinky-friends.png" />
     <title>CHINKY — Share your spark</title>
     <link rel="icon" type="image/png" href="assets/chinky-logo.png" />
-    <link rel="preload" as="image" href="assets/chinky-friends.png" />
+    <link rel="apple-touch-icon" href="assets/chinky-logo.png" />
+    <link rel="preload" as="image" href="assets/chinky-friends.png" fetchpriority="high" />
     <link rel="stylesheet" href="styles.css" />
     <script src="app.js" defer></script>
   </head>
@@ -118,7 +121,7 @@
             <div class="orbit orbit--one" aria-hidden="true"></div>
             <div class="orbit orbit--two" aria-hidden="true"></div>
             <div class="floating-card floating-card--vibe">
-              <span class="mini-vibe"><img src="assets/chinky-friends.png" alt="" /></span>
+              <span class="mini-vibe"><img src="assets/chinky-friends.png" alt="" width="1024" height="1536" decoding="async" /></span>
               <span><strong>Vibes</strong><small>Friends are sharing</small></span>
               <span class="live-pulse"></span>
             </div>
@@ -130,7 +133,7 @@
             <div class="phone phone--hero" aria-label="CHINKY Spark preview">
               <div class="phone-top"><span>9:41</span><span class="phone-island"></span><span>● ◒</span></div>
               <div class="spark-preview">
-                <img src="assets/chinky-friends.png" alt="Friends creating a social video together" />
+                <img src="assets/chinky-friends.png" alt="Friends creating a social video together" width="1024" height="1536" decoding="async" fetchpriority="high" />
                 <div class="spark-shade"></div>
                 <div class="spark-topbar"><strong>Following</strong><span>For You</span><button aria-label="Search">⌕</button></div>
                 <div class="spark-actions" aria-hidden="true">
@@ -175,7 +178,7 @@
               <div class="feature-visual flow-visual" aria-hidden="true">
                 <div class="post-card">
                   <div class="post-head"><span class="post-avatar">A</span><span><b>aarav.jpg</b><small>Mumbai · 2m</small></span><i>•••</i></div>
-                  <div class="post-image"><img src="assets/chinky-friends.png" alt="" /></div>
+                  <div class="post-image"><img src="assets/chinky-friends.png" alt="" width="1024" height="1536" loading="lazy" decoding="async" /></div>
                   <div class="post-actions"><span>♥</span><span>◯</span><span>↗</span><span>▢</span></div>
                 </div>
               </div>
@@ -188,7 +191,7 @@
             <article class="feature-card feature-card--spark" data-reveal data-reveal-delay="80">
               <div class="feature-number">02</div>
               <div class="feature-visual spark-visual" aria-hidden="true">
-                <img src="assets/chinky-friends.png" alt="" />
+                <img src="assets/chinky-friends.png" alt="" width="1024" height="1536" loading="lazy" decoding="async" />
                 <span class="play-ring"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5Z"></path></svg></span>
                 <div class="spark-chip">⚡ SPARK</div>
               </div>
@@ -248,12 +251,12 @@
                 </div>
                 <article class="demo-post">
                   <header><span class="demo-user">M</span><div><b>meher</b><small>Rooftop diaries · now</small></div><span>•••</span></header>
-                  <img src="assets/chinky-friends.png" alt="Three friends laughing together" />
+                  <img src="assets/chinky-friends.png" alt="Three friends laughing together" width="1024" height="1536" loading="lazy" decoding="async" />
                   <div class="demo-post-actions">
-                    <button type="button" aria-label="Like post" data-like-button><span data-like-icon>♡</span></button>
-                    <button type="button" aria-label="Comment">◯</button>
-                    <button type="button" aria-label="Share">↗</button>
-                    <button class="bookmark" type="button" aria-label="Save">▢</button>
+                    <button type="button" aria-label="Like post" aria-pressed="false" data-like-button><span data-like-icon>♡</span></button>
+                    <button type="button" aria-label="Comment" data-comment-button>◯</button>
+                    <button type="button" aria-label="Share" data-share-button>↗</button>
+                    <button class="bookmark" type="button" aria-label="Save" aria-pressed="false" data-save-button>▢</button>
                   </div>
                   <p><b data-like-count>1,284 likes</b></p>
                   <p><b>meher</b> sunset, stories &amp; my favourite humans ✨</p>
@@ -263,13 +266,13 @@
 
               <section class="demo-panel" id="panel-spark" role="tabpanel" data-demo-panel="spark" hidden>
                 <div class="demo-spark">
-                  <img src="assets/chinky-friends.png" alt="Friends making a short video" />
+                  <img src="assets/chinky-friends.png" alt="Friends making a short video" width="1024" height="1536" loading="lazy" decoding="async" />
                   <div class="spark-shade"></div>
                   <div class="spark-topbar"><strong>Following</strong><span>For You</span><button aria-label="Search">⌕</button></div>
                   <button class="spark-play-button" type="button" aria-label="Play Spark" data-spark-play><span>▶</span></button>
                   <div class="spark-actions">
                     <span class="spark-avatar">C</span>
-                    <button type="button" data-spark-like>♡<small>24.8K</small></button>
+                    <button type="button" aria-label="Like Spark" aria-pressed="false" data-spark-like>♡<small>24.8K</small></button>
                     <span>◯<small>482</small></span>
                     <span>↗<small>Share</small></span>
                   </div>
@@ -363,8 +366,8 @@
         </div>
         <div class="footer-links">
           <div><strong>Explore</strong><a href="#experience">Experience</a><a href="#demo">Demo</a><a href="#creators">Creators</a></div>
-          <div><strong>Support</strong><a href="mailto:appchinky@gmail.com">Contact us</a><a href="#safety">Safety</a><button type="button" data-legal="privacy">Privacy</button></div>
-          <div><strong>Legal</strong><button type="button" data-legal="terms">Terms</button><button type="button" data-legal="audio">Audio policy</button></div>
+          <div><strong>Support</strong><a href="mailto:appchinky@gmail.com">Contact us</a><a href="#safety">Safety</a><a href="/delete-account">Delete account</a></div>
+          <div><strong>Legal</strong><a href="/privacy-policy" data-legal="privacy">Privacy</a><a href="/terms-of-service" data-legal="terms">Terms</a><a href="/audio-policy" data-legal="audio">Audio policy</a><a href="/child-safety">Child safety</a></div>
         </div>
       </div>
       <div class="container footer-bottom"><span>© <span data-year></span> CHINKY. All rights reserved.</span><span>Made for meaningful connection.</span></div>
@@ -378,7 +381,7 @@
     <div class="story-modal" role="dialog" aria-modal="true" aria-label="CHINKY story" hidden data-story-modal>
       <button type="button" aria-label="Close story" data-story-close>×</button>
       <div class="story-card">
-        <div class="story-visual"><img src="assets/chinky-friends.png" alt="Friends sharing a moment together" /><span class="story-play">▶</span></div>
+        <div class="story-visual"><img src="assets/chinky-friends.png" alt="Friends sharing a moment together" width="1024" height="1536" loading="lazy" decoding="async" /><span class="story-play">▶</span></div>
         <div><span class="section-kicker">Why CHINKY</span><h2>Small moments.<br />Real people.</h2><p>CHINKY is being shaped around a simple idea: social should feel social again—creative, expressive, and close to the people who matter.</p><a class="button button--primary" href="#join" data-story-close>Join the journey</a></div>
       </div>
     </div>
