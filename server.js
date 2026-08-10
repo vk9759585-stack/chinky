@@ -12,15 +12,22 @@ const connectDB = require("./config/db");
 
 // Initialize app
 const app = express();
-const websiteRoot = path.resolve(__dirname, "..", "website");
+const websiteRoot = path.resolve(__dirname, "website");
 
 const isNonEmpty = (value) => typeof value === "string" && value.trim().length > 0;
 const isProd = process.env.NODE_ENV === "production";
 
-const allowedOrigins = (process.env.FRONTEND_ORIGINS || "")
+const defaultProductionOrigins = [
+  "https://chinkyapp.com",
+  "https://www.chinkyapp.com",
+];
+const configuredOrigins = (process.env.FRONTEND_ORIGINS || "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+const allowedOrigins = configuredOrigins.length > 0
+  ? configuredOrigins
+  : (isProd ? defaultProductionOrigins : []);
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -214,9 +221,29 @@ app.use("/assets", express.static(path.join(websiteRoot, "assets"), {
   maxAge: isProd ? "1h" : 0,
 }));
 
-app.get(["/styles.css", "/app.js"], (req, res) => {
+app.get(["/styles.css", "/app.js", "/robots.txt", "/sitemap.xml"], (req, res) => {
   res.set("Cache-Control", isProd ? "public, max-age=3600" : "no-cache");
   return res.sendFile(path.join(websiteRoot, req.path.slice(1)));
+});
+
+app.get("/.well-known/assetlinks.json", (_req, res) => {
+  res.set("Cache-Control", isProd ? "public, max-age=3600" : "no-cache");
+  res.type("application/json");
+  return res.sendFile(path.join(websiteRoot, ".well-known", "assetlinks.json"));
+});
+
+const publicDocuments = Object.freeze({
+  "/privacy-policy": "privacy-policy.md",
+  "/terms-of-service": "terms-of-service.md",
+  "/delete-account": "delete-account.md",
+  "/child-safety": "csae-policy.md",
+  "/audio-policy": "audio-policy.md",
+});
+
+app.get(Object.keys(publicDocuments), (req, res) => {
+  res.set("Cache-Control", isProd ? "public, max-age=3600" : "no-cache");
+  res.type("text/plain; charset=utf-8");
+  return res.sendFile(path.join(__dirname, publicDocuments[req.path]));
 });
 
 app.get("/", (req, res) => {

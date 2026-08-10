@@ -2,6 +2,8 @@
 
 Production API for Chinky mobile/web clients.
 
+Production website and API origin: `https://chinkyapp.com`
+
 ## Quick Start
 
 1. Install dependencies: npm install
@@ -9,7 +11,7 @@ Production API for Chinky mobile/web clients.
 3. Fill required values in .env: MONGO_URI and JWT_SECRET
 4. Run in development: npm run dev
 
-The same server also hosts the website from `../website`. After startup, open
+The same server also hosts the website from `website/`. After startup, open
 `http://127.0.0.1:5000`; API routes remain available under `/api`, website
 session routes under `/auth`, and website dashboard routes under `/web`.
 
@@ -50,7 +52,7 @@ CI workflow:
 
 - [.github/workflows/backend-smoke-tests.yml](../.github/workflows/backend-smoke-tests.yml)
 - Required GitHub repository secrets:
-- SMOKE_BASE_URL example: `https://chinky.onrender.com`
+- SMOKE_BASE_URL example: `https://chinkyapp.com`
 - SMOKE_LOGIN
 - SMOKE_PASSWORD
 - Optional: SMOKE_SEARCH_QUERY

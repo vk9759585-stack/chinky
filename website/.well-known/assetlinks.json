@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.chinky.social",
+      "sha256_cert_fingerprints": [
+        "11:12:62:C2:E2:80:D2:C4:E3:13:34:0D:4B:95:D3:9C:8E:36:0D:3C:0E:B3:34:1F:5D:C4:12:40:A7:7D:34:BE"
+      ]
+    }
+  }
+]

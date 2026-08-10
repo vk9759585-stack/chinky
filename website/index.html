@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="CHINKY is a social space to share posts, create Sparks, catch up through Vibes, and stay close to your people."
+    />
+    <meta name="theme-color" content="#11111a" />
+    <link rel="canonical" href="https://chinkyapp.com/" />
+    <meta property="og:title" content="CHINKY — Share your spark" />
+    <meta
+      property="og:description"
+      content="Create, share, and connect in a social space built around your people."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CHINKY" />
+    <meta property="og:url" content="https://chinkyapp.com/" />
+    <meta property="og:image" content="https://chinkyapp.com/assets/chinky-friends.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CHINKY — Share your spark" />
+    <meta
+      name="twitter:description"
+      content="Create, share, and connect in a social space built around your people."
+    />
+    <meta name="twitter:image" content="https://chinkyapp.com/assets/chinky-friends.png" />
+    <title>CHINKY — Share your spark</title>
+    <link rel="icon" type="image/png" href="assets/chinky-logo.png" />
+    <link rel="preload" as="image" href="assets/chinky-friends.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <div class="page-glow page-glow--one" aria-hidden="true"></div>
+    <div class="page-glow page-glow--two" aria-hidden="true"></div>
+
+    <header class="site-header" data-header>
+      <div class="container nav-wrap">
+        <a class="brand" href="#top" aria-label="CHINKY home">
+          <img src="assets/chinky-logo.png" alt="" width="44" height="44" />
+          <span>CHINKY</span>
+        </a>
+
+        <nav class="desktop-nav" aria-label="Main navigation">
+          <a href="#experience">Experience</a>
+          <a href="#demo">Live demo</a>
+          <a href="#creators">Creators</a>
+          <a href="#safety">Safety</a>
+        </nav>
+
+        <div class="nav-actions">
+          <button class="icon-button theme-toggle" type="button" aria-label="Switch to light mode" data-theme-toggle>
+            <svg class="theme-icon theme-icon--sun" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"></path>
+            </svg>
+            <svg class="theme-icon theme-icon--moon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"></path>
+            </svg>
+          </button>
+          <button class="button button--small button--ghost desktop-login" type="button" data-auth-open>Log in</button>
+          <a class="button button--small button--primary desktop-cta" href="#join">Join the waitlist</a>
+          <button class="menu-button" type="button" aria-expanded="false" aria-controls="mobile-menu" data-menu-toggle>
+            <span></span><span></span><span></span>
+            <span class="sr-only">Open menu</span>
+          </button>
+        </div>
+      </div>
+
+      <nav class="mobile-nav" id="mobile-menu" aria-label="Mobile navigation" data-mobile-menu>
+        <a href="#experience">Experience</a>
+        <a href="#demo">Live demo</a>
+        <a href="#creators">Creators</a>
+        <a href="#safety">Safety</a>
+        <button class="button button--ghost" type="button" data-auth-open>Log in</button>
+        <a class="button button--primary" href="#join">Join the waitlist</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero section" id="top">
+        <div class="container hero-grid">
+          <div class="hero-copy" data-reveal>
+            <div class="eyebrow">
+              <span class="eyebrow-dot"></span>
+              Your people. Your vibe. Your space.
+            </div>
+            <h1>Share your <span>spark.</span><br />Find your people.</h1>
+            <p class="hero-lede">
+              CHINKY brings photos, short videos, stories, chats, and calls into one vibrant place made for real connection.
+            </p>
+            <div class="hero-actions">
+              <a class="button button--primary" href="#demo">
+                Explore the experience
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+              </a>
+              <button class="button button--ghost" type="button" data-preview-button>
+                <span class="play-icon">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 8 5-8 5Z"></path></svg>
+                </span>
+                Watch the story
+              </button>
+            </div>
+            <div class="hero-proof" aria-label="Core CHINKY experiences">
+              <div class="avatar-stack" aria-hidden="true">
+                <span class="avatar avatar--one">A</span>
+                <span class="avatar avatar--two">R</span>
+                <span class="avatar avatar--three">M</span>
+              </div>
+              <p><strong>One social universe</strong><span>Flow · Spark · Vibes · Chat</span></p>
+            </div>
+          </div>
+
+          <div class="hero-visual" data-reveal data-reveal-delay="120">
+            <div class="orbit orbit--one" aria-hidden="true"></div>
+            <div class="orbit orbit--two" aria-hidden="true"></div>
+            <div class="floating-card floating-card--vibe">
+              <span class="mini-vibe"><img src="assets/chinky-friends.png" alt="" /></span>
+              <span><strong>Vibes</strong><small>Friends are sharing</small></span>
+              <span class="live-pulse"></span>
+            </div>
+            <div class="floating-card floating-card--message">
+              <span class="message-avatar">R</span>
+              <span><strong>Riya</strong><small>That Spark is everything 🔥</small></span>
+            </div>
+
+            <div class="phone phone--hero" aria-label="CHINKY Spark preview">
+              <div class="phone-top"><span>9:41</span><span class="phone-island"></span><span>● ◒</span></div>
+              <div class="spark-preview">
+                <img src="assets/chinky-friends.png" alt="Friends creating a social video together" />
+                <div class="spark-shade"></div>
+                <div class="spark-topbar"><strong>Following</strong><span>For You</span><button aria-label="Search">⌕</button></div>
+                <div class="spark-actions" aria-hidden="true">
+                  <span class="spark-avatar">C</span>
+                  <span>♡<small>24.8K</small></span>
+                  <span>◯<small>482</small></span>
+                  <span>↗<small>Share</small></span>
+                </div>
+                <div class="spark-caption">
+                  <strong>@meher</strong>
+                  <p>Rooftop scenes with the day ones ✨</p>
+                  <span>♫ Original audio · meher</span>
+                </div>
+              </div>
+              <div class="phone-homebar"></div>
+            </div>
+          </div>
+        </div>
+        <div class="scroll-cue" aria-hidden="true"><span></span>Scroll to discover</div>
+      </section>
+
+      <section class="marquee" aria-label="CHINKY capabilities">
+        <div class="marquee-track">
+          <span>CREATE <i></i> SHARE <i></i> CONNECT <i></i> DISCOVER <i></i> EXPRESS <i></i></span>
+          <span aria-hidden="true">CREATE <i></i> SHARE <i></i> CONNECT <i></i> DISCOVER <i></i> EXPRESS <i></i></span>
+        </div>
+      </section>
+
+      <section class="section experience" id="experience">
+        <div class="container">
+          <div class="section-heading" data-reveal>
+            <div>
+              <span class="section-kicker">Everything feels closer</span>
+              <h2>One place for every way you connect.</h2>
+            </div>
+            <p>From a quiet photo drop to a Spark everyone talks about, CHINKY lets every side of you show up naturally.</p>
+          </div>
+
+          <div class="feature-grid">
+            <article class="feature-card feature-card--flow" data-reveal>
+              <div class="feature-number">01</div>
+              <div class="feature-visual flow-visual" aria-hidden="true">
+                <div class="post-card">
+                  <div class="post-head"><span class="post-avatar">A</span><span><b>aarav.jpg</b><small>Mumbai · 2m</small></span><i>•••</i></div>
+                  <div class="post-image"><img src="assets/chinky-friends.png" alt="" /></div>
+                  <div class="post-actions"><span>♥</span><span>◯</span><span>↗</span><span>▢</span></div>
+                </div>
+              </div>
+              <span class="card-kicker">FLOW</span>
+              <h3>Moments worth keeping</h3>
+              <p>Share photos, videos, captions, and conversations in a feed built around the people you choose.</p>
+              <a href="#demo">Try the feed <span>↗</span></a>
+            </article>
+
+            <article class="feature-card feature-card--spark" data-reveal data-reveal-delay="80">
+              <div class="feature-number">02</div>
+              <div class="feature-visual spark-visual" aria-hidden="true">
+                <img src="assets/chinky-friends.png" alt="" />
+                <span class="play-ring"><svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5Z"></path></svg></span>
+                <div class="spark-chip">⚡ SPARK</div>
+              </div>
+              <span class="card-kicker">SPARK</span>
+              <h3>Short. Bold. Unmissable.</h3>
+              <p>Create vertical videos with music, captions, and editing tools—then discover what is sparking right now.</p>
+              <a href="#demo">Open Sparks <span>↗</span></a>
+            </article>
+
+            <article class="feature-card feature-card--chat" data-reveal data-reveal-delay="160">
+              <div class="feature-number">03</div>
+              <div class="feature-visual chat-visual" aria-hidden="true">
+                <div class="chat-line chat-line--in">You free this evening?</div>
+                <div class="chat-line chat-line--out">Always for the crew 💗</div>
+                <div class="chat-call"><span>◉</span><div><b>Group video call</b><small>3 friends joined</small></div><i>↗</i></div>
+              </div>
+              <span class="card-kicker">CHAT & CALLS</span>
+              <h3>Close, even from far away</h3>
+              <p>Message in real time, see when friends are online, and jump into a voice or video call when words are not enough.</p>
+              <a href="#demo">Start a chat <span>↗</span></a>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section demo-section" id="demo">
+        <div class="container demo-grid">
+          <div class="demo-copy" data-reveal>
+            <span class="section-kicker">Tap into CHINKY</span>
+            <h2>More than a preview.<br />Try the vibe.</h2>
+            <p>Switch between the live product moments below. Like a post, send a message, and see how CHINKY moves with you.</p>
+            <div class="demo-tabs" role="tablist" aria-label="CHINKY demo screens">
+              <button class="demo-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-flow" data-demo-tab="flow">
+                <span>01</span><strong>Flow</strong><small>Share everyday moments</small>
+              </button>
+              <button class="demo-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-spark" data-demo-tab="spark">
+                <span>02</span><strong>Spark</strong><small>Discover short videos</small>
+              </button>
+              <button class="demo-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-chat" data-demo-tab="chat">
+                <span>03</span><strong>Chat</strong><small>Talk in real time</small>
+              </button>
+            </div>
+          </div>
+
+          <div class="demo-stage" data-reveal data-reveal-delay="100">
+            <div class="demo-halo" aria-hidden="true"></div>
+            <div class="phone phone--demo">
+              <div class="phone-top"><span>9:41</span><span class="phone-island"></span><span>● ◒</span></div>
+
+              <section class="demo-panel is-active" id="panel-flow" role="tabpanel" data-demo-panel="flow">
+                <div class="app-bar"><span class="app-wordmark">CHINKY</span><span>♡　◌</span></div>
+                <div class="vibes-row">
+                  <div><span class="vibe-ring vibe-add">＋</span><small>Your vibe</small></div>
+                  <div><span class="vibe-ring"><b>R</b></span><small>riya</small></div>
+                  <div><span class="vibe-ring"><b>K</b></span><small>kabir</small></div>
+                  <div><span class="vibe-ring"><b>M</b></span><small>meher</small></div>
+                </div>
+                <article class="demo-post">
+                  <header><span class="demo-user">M</span><div><b>meher</b><small>Rooftop diaries · now</small></div><span>•••</span></header>
+                  <img src="assets/chinky-friends.png" alt="Three friends laughing together" />
+                  <div class="demo-post-actions">
+                    <button type="button" aria-label="Like post" data-like-button><span data-like-icon>♡</span></button>
+                    <button type="button" aria-label="Comment">◯</button>
+                    <button type="button" aria-label="Share">↗</button>
+                    <button class="bookmark" type="button" aria-label="Save">▢</button>
+                  </div>
+                  <p><b data-like-count>1,284 likes</b></p>
+                  <p><b>meher</b> sunset, stories &amp; my favourite humans ✨</p>
+                </article>
+                <div class="app-bottom-nav"><b>⌂<small>Home</small></b><span>▶<small>Spark</small></span><span class="create-dot">＋</span><span>♢<small>Updates</small></span><span>◎<small>Profile</small></span></div>
+              </section>
+
+              <section class="demo-panel" id="panel-spark" role="tabpanel" data-demo-panel="spark" hidden>
+                <div class="demo-spark">
+                  <img src="assets/chinky-friends.png" alt="Friends making a short video" />
+                  <div class="spark-shade"></div>
+                  <div class="spark-topbar"><strong>Following</strong><span>For You</span><button aria-label="Search">⌕</button></div>
+                  <button class="spark-play-button" type="button" aria-label="Play Spark" data-spark-play><span>▶</span></button>
+                  <div class="spark-actions">
+                    <span class="spark-avatar">C</span>
+                    <button type="button" data-spark-like>♡<small>24.8K</small></button>
+                    <span>◯<small>482</small></span>
+                    <span>↗<small>Share</small></span>
+                  </div>
+                  <div class="spark-caption"><strong>@meher</strong><p>Rooftop scenes with the day ones ✨</p><span>♫ Original audio · meher</span></div>
+                </div>
+              </section>
+
+              <section class="demo-panel demo-chat" id="panel-chat" role="tabpanel" data-demo-panel="chat" hidden>
+                <div class="chat-header"><button aria-label="Back">‹</button><span class="demo-user">R</span><div><b>Riya</b><small><i></i> Online</small></div><span>⌕　◉</span></div>
+                <div class="chat-messages" data-chat-messages>
+                  <span class="chat-date">Today</span>
+                  <div class="bubble bubble--in">Did you see that new Spark? 👀<small>8:34 PM</small></div>
+                  <div class="bubble bubble--out">The rooftop one? Loved it.</div>
+                  <div class="bubble bubble--in">We should make one tomorrow! 🔥<small>8:35 PM</small></div>
+                </div>
+                <form class="chat-composer" data-chat-form>
+                  <button type="button" aria-label="Emoji">☺</button>
+                  <label class="sr-only" for="chat-input">Message Riya</label>
+                  <input id="chat-input" type="text" placeholder="Message" autocomplete="off" maxlength="80" />
+                  <button class="send-button" type="submit" aria-label="Send message">➤</button>
+                </form>
+              </section>
+
+              <div class="phone-homebar"></div>
+            </div>
+            <div class="demo-note"><span>●</span> Interactive preview</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section creators" id="creators">
+        <div class="container creator-card" data-reveal>
+          <div class="creator-copy">
+            <span class="section-kicker">Create without limits</span>
+            <h2>Your ideas deserve the spotlight.</h2>
+            <p>Capture, edit, add music, publish, and understand what connects—all from one creator-friendly toolkit.</p>
+            <a class="button button--light" href="#join">Build your audience</a>
+          </div>
+          <div class="creator-tools" aria-label="Creator tools">
+            <div class="tool-card tool-card--camera"><span>◎</span><b>Social camera</b><small>Capture your moment</small></div>
+            <div class="tool-card tool-card--edit"><span>✦</span><b>Beauty &amp; edits</b><small>Make it feel like you</small></div>
+            <div class="tool-card tool-card--music"><span>♫</span><b>Original audio</b><small>Find your sound</small></div>
+            <div class="tool-card tool-card--insights"><span>↗</span><b>Creator insights</b><small>Learn what lands</small></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section safety" id="safety">
+        <div class="container safety-grid">
+          <div class="safety-visual" data-reveal>
+            <div class="shield-mark"><span>✓</span></div>
+            <div class="safety-chip safety-chip--one"><i>◉</i><span><b>Privacy controls</b><small>You decide who sees you</small></span></div>
+            <div class="safety-chip safety-chip--two"><i>♢</i><span><b>Account security</b><small>Protection that stays on</small></span></div>
+            <div class="safety-chip safety-chip--three"><i>♡</i><span><b>Healthy community</b><small>Tools to report and block</small></span></div>
+          </div>
+          <div class="safety-copy" data-reveal data-reveal-delay="100">
+            <span class="section-kicker">Built for peace of mind</span>
+            <h2>Your space should feel like yours.</h2>
+            <p>Private-account controls, activity preferences, reporting tools, and account recovery help you stay in charge of your CHINKY experience.</p>
+            <ul>
+              <li><span>✓</span> Control who can follow and view your profile</li>
+              <li><span>✓</span> Manage activity status and notifications</li>
+              <li><span>✓</span> Report content or accounts that cross the line</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section join-section" id="join">
+        <div class="container join-card" data-reveal>
+          <div class="join-orb join-orb--one" aria-hidden="true"></div>
+          <div class="join-orb join-orb--two" aria-hidden="true"></div>
+          <span class="section-kicker">The next moment starts here</span>
+          <h2>Ready to share your spark?</h2>
+          <p>Be first to know when CHINKY opens its doors.</p>
+          <form class="waitlist-form" data-waitlist-form novalidate>
+            <label class="sr-only" for="waitlist-email">Email address</label>
+            <input id="waitlist-email" name="email" type="email" placeholder="Enter your email" autocomplete="email" required />
+            <button class="button button--primary" type="submit">Notify me <span>↗</span></button>
+          </form>
+          <small class="form-note">No spam. Just the important stuff.</small>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-top">
+        <div class="footer-brand">
+          <a class="brand" href="#top"><img src="assets/chinky-logo.png" alt="" width="48" height="48" /><span>CHINKY</span></a>
+          <p>Create. Share. Connect.</p>
+        </div>
+        <div class="footer-links">
+          <div><strong>Explore</strong><a href="#experience">Experience</a><a href="#demo">Demo</a><a href="#creators">Creators</a></div>
+          <div><strong>Support</strong><a href="mailto:appchinky@gmail.com">Contact us</a><a href="#safety">Safety</a><button type="button" data-legal="privacy">Privacy</button></div>
+          <div><strong>Legal</strong><button type="button" data-legal="terms">Terms</button><button type="button" data-legal="audio">Audio policy</button></div>
+        </div>
+      </div>
+      <div class="container footer-bottom"><span>© <span data-year></span> CHINKY. All rights reserved.</span><span>Made for meaningful connection.</span></div>
+    </footer>
+
+    <dialog class="legal-dialog" data-legal-dialog>
+      <button class="dialog-close" type="button" aria-label="Close" data-dialog-close>×</button>
+      <div data-dialog-content></div>
+    </dialog>
+
+    <div class="story-modal" role="dialog" aria-modal="true" aria-label="CHINKY story" hidden data-story-modal>
+      <button type="button" aria-label="Close story" data-story-close>×</button>
+      <div class="story-card">
+        <div class="story-visual"><img src="assets/chinky-friends.png" alt="Friends sharing a moment together" /><span class="story-play">▶</span></div>
+        <div><span class="section-kicker">Why CHINKY</span><h2>Small moments.<br />Real people.</h2><p>CHINKY is being shaped around a simple idea: social should feel social again—creative, expressive, and close to the people who matter.</p><a class="button button--primary" href="#join" data-story-close>Join the journey</a></div>
+      </div>
+    </div>
+
+    <dialog class="account-dialog" data-account-dialog aria-labelledby="account-title">
+      <div class="account-shell">
+        <header class="account-header">
+          <a class="brand" href="#top" aria-label="CHINKY home">
+            <img src="assets/chinky-logo.png" alt="" width="42" height="42" />
+            <span>CHINKY</span>
+          </a>
+          <div class="account-header-actions">
+            <button class="account-icon-button" type="button" aria-label="Refresh account" data-account-refresh>↻</button>
+            <button class="account-icon-button account-header-logout" type="button" aria-label="Log out" data-account-logout>↪</button>
+            <button class="account-icon-button" type="button" aria-label="Close account" data-account-close>×</button>
+          </div>
+        </header>
+
+        <div class="account-layout">
+          <aside class="account-sidebar">
+            <div class="account-person">
+              <div class="account-avatar" data-account-avatar>C</div>
+              <div><strong data-account-name>CHINKY user</strong><span data-account-username>@chinky</span></div>
+            </div>
+            <nav class="account-nav" aria-label="Account navigation">
+              <button class="is-active" type="button" data-account-tab="overview"><span>⌂</span>Overview</button>
+              <button type="button" data-account-tab="flow"><span>▦</span>My flow</button>
+              <button type="button" data-account-tab="sparks"><span>▶</span>Sparks</button>
+              <button type="button" data-account-tab="messages"><span>◯</span>Messages</button>
+            </nav>
+            <button class="account-logout" type="button" data-account-logout><span>↪</span>Log out</button>
+          </aside>
+
+          <div class="account-main">
+            <div class="account-status" role="status" aria-live="polite" data-account-status hidden></div>
+
+            <section class="account-panel is-active" data-account-panel="overview">
+              <div class="account-title-row">
+                <div><span class="section-kicker">Your CHINKY</span><h2 id="account-title">Welcome back</h2></div>
+                <span class="account-online"><i></i> Connected</span>
+              </div>
+              <div class="account-stats">
+                <article><span>Posts</span><strong data-stat-posts>—</strong></article>
+                <article><span>Sparks</span><strong data-stat-sparks>—</strong></article>
+                <article><span>Followers</span><strong data-stat-followers>—</strong></article>
+                <article><span>Following</span><strong data-stat-following>—</strong></article>
+              </div>
+              <div class="account-overview-grid">
+                <article class="account-welcome-card">
+                  <span class="account-welcome-icon">✦</span>
+                  <div><span class="section-kicker">Profile</span><h3 data-profile-display-name>Your space is ready</h3><p data-profile-bio>Share something new or see what your people are creating.</p></div>
+                </article>
+                <article class="account-quick-card">
+                  <span class="section-kicker">Quick access</span>
+                  <button type="button" data-account-jump="flow"><span>▦</span><b>Browse Flow</b><i>→</i></button>
+                  <button type="button" data-account-jump="sparks"><span>▶</span><b>Watch Sparks</b><i>→</i></button>
+                  <button type="button" data-account-jump="messages"><span>◯</span><b>Open chats</b><i>→</i></button>
+                </article>
+              </div>
+            </section>
+
+            <section class="account-panel" data-account-panel="flow" hidden>
+              <div class="account-title-row"><div><span class="section-kicker">Latest moments</span><h2>Flow</h2></div><span class="account-count" data-flow-count></span></div>
+              <div class="account-content-grid" data-flow-content></div>
+            </section>
+
+            <section class="account-panel" data-account-panel="sparks" hidden>
+              <div class="account-title-row"><div><span class="section-kicker">Made to move</span><h2>Sparks</h2></div><span class="account-count" data-sparks-count></span></div>
+              <div class="account-spark-grid" data-sparks-content></div>
+            </section>
+
+            <section class="account-panel" data-account-panel="messages" hidden>
+              <div class="account-title-row"><div><span class="section-kicker">Stay close</span><h2>Messages</h2></div><span class="account-count" data-messages-count></span></div>
+              <div class="account-message-list" data-messages-content></div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <div class="toast" role="status" aria-live="polite" data-toast></div>
+
+    <dialog class="auth-dialog" data-auth-dialog aria-labelledby="auth-title">
+      <button class="auth-close" type="button" aria-label="Close" data-auth-close>×</button>
+      <div class="auth-brand"><img src="assets/chinky-logo.png" alt="" width="52" height="52"><strong>CHINKY</strong></div>
+      <h2 id="auth-title">Welcome back</h2>
+      <p class="auth-subtitle">Use the same CHINKY account you use in the app.</p>
+      <form class="auth-form" data-login-form autocomplete="on">
+        <label>Username, email or phone<input name="login" autocomplete="username" maxlength="120" required></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
+        <p class="auth-error" data-auth-error role="alert" aria-live="polite"></p>
+        <button class="button button--primary auth-submit" type="submit">Log in securely</button>
+      </form>
+      <p class="auth-note">Your password is handled through CHINKY's secure server session and is never stored in browser storage.</p>
+    </dialog>
+
+  </body>
+</html>

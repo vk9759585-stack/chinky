@@ -2,7 +2,7 @@ const args = process.argv.slice(2);
 const folderIndex = args.indexOf('--folder');
 const folderName = folderIndex >= 0 ? args[folderIndex + 1] : null;
 
-const baseUrl = (process.env.SMOKE_BASE_URL || process.env.BASE_URL || 'https://chinky.onrender.com')
+const baseUrl = (process.env.SMOKE_BASE_URL || process.env.BASE_URL || 'https://chinkyapp.com')
   .replace(/\/+$/, '');
 const login = process.env.SMOKE_LOGIN || '';
 const password = process.env.SMOKE_PASSWORD || '';
