@@ -410,3 +410,60 @@ exports.uploadProfilePhoto = async (req, res) => {
         });
     }
 };
+
+// ======================================
+// PRIVACY SETTINGS
+// ======================================
+const PRIVACY_ENUMS = {
+    comments: ["everyone", "friends", "no_one"],
+    mentions: ["everyone", "friends", "no_one"],
+    directMessages: ["everyone", "friends", "no_one"],
+    activityStatus: ["public", "friends", "no_one"],
+    reuseContent: ["everyone", "friends", "no_one"],
+    followingList: ["everyone", "only_you"],
+    likedVideos: ["everyone", "only_you"]
+};
+const PRIVACY_BOOLEANS = [
+    "creatorCareMode", "filterUnwantedComments", "readStatus",
+    "displayProfileWhenSharingLinks", "videoDownloads", "viewerHistory"
+];
+
+exports.getPrivacySettings = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select("isPrivate privacySettings");
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        return res.json({ success: true, data: { isPrivate: user.isPrivate, ...(user.privacySettings?.toObject?.() || user.privacySettings || {}) } });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: "Could not load privacy settings" });
+    }
+};
+
+exports.updatePrivacySettings = async (req, res) => {
+    try {
+        const set = {};
+        if (typeof req.body.isPrivate === "boolean") set.isPrivate = req.body.isPrivate;
+        for (const [key, allowed] of Object.entries(PRIVACY_ENUMS)) {
+            if (req.body[key] !== undefined) {
+                if (!allowed.includes(req.body[key])) return res.status(400).json({ success: false, message: `Invalid ${key}` });
+                set[`privacySettings.${key}`] = req.body[key];
+            }
+        }
+        for (const key of PRIVACY_BOOLEANS) {
+            if (req.body[key] !== undefined) {
+                if (typeof req.body[key] !== "boolean") return res.status(400).json({ success: false, message: `Invalid ${key}` });
+                set[`privacySettings.${key}`] = req.body[key];
+            }
+        }
+        if (req.body.commentKeywords !== undefined) {
+            if (!Array.isArray(req.body.commentKeywords)) return res.status(400).json({ success: false, message: "commentKeywords must be an array" });
+            const words = [...new Set(req.body.commentKeywords.map(v => String(v).trim().toLowerCase()).filter(Boolean))].slice(0, 100);
+            if (words.some(v => v.length > 50)) return res.status(400).json({ success: false, message: "Keyword too long" });
+            set["privacySettings.commentKeywords"] = words;
+        }
+        const user = await User.findByIdAndUpdate(req.user.id, { $set: set }, { new: true, runValidators: true }).select("isPrivate privacySettings");
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        return res.json({ success: true, data: { isPrivate: user.isPrivate, ...(user.privacySettings?.toObject?.() || user.privacySettings || {}) } });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: "Could not save privacy settings" });
+    }
+};

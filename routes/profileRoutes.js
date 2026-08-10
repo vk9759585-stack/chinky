@@ -12,6 +12,9 @@ router.get("/", auth, controller.getProfile);
 
 router.put("/", auth, controller.updateProfile);
 
+router.get("/privacy", auth, controller.getPrivacySettings);
+router.put("/privacy", auth, controller.updatePrivacySettings);
+
 // ====================================
 // USER CONTENT
 // ====================================

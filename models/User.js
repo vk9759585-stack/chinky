@@ -82,6 +82,23 @@ const userSchema = new mongoose.Schema(
             default: false
         },
 
+        privacySettings: {
+            comments: { type: String, enum: ["everyone", "friends", "no_one"], default: "everyone" },
+            creatorCareMode: { type: Boolean, default: false },
+            filterUnwantedComments: { type: Boolean, default: true },
+            commentKeywords: { type: [String], default: [] },
+            mentions: { type: String, enum: ["everyone", "friends", "no_one"], default: "everyone" },
+            directMessages: { type: String, enum: ["everyone", "friends", "no_one"], default: "friends" },
+            readStatus: { type: Boolean, default: true },
+            activityStatus: { type: String, enum: ["public", "friends", "no_one"], default: "friends" },
+            reuseContent: { type: String, enum: ["everyone", "friends", "no_one"], default: "everyone" },
+            displayProfileWhenSharingLinks: { type: Boolean, default: true },
+            videoDownloads: { type: Boolean, default: false },
+            followingList: { type: String, enum: ["everyone", "only_you"], default: "everyone" },
+            likedVideos: { type: String, enum: ["everyone", "only_you"], default: "only_you" },
+            viewerHistory: { type: Boolean, default: true }
+        },
+
         accountType: {
             type: String,
             enum: ["personal", "professional"],
