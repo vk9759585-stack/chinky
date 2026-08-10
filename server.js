@@ -170,6 +170,7 @@ app.use("/api/security", require("./routes/securityRoutes"));
 
 // SUPPORT
 app.use("/api/support", require("./routes/supportRoutes"));
+app.use("/api/settings", require("./routes/settingsRoutes"));
 
 // =====================
 // HEALTH CHECK
