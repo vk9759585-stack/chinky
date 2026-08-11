@@ -142,6 +142,7 @@ app.use("/api/comments", require("./routes/commentRoutes"));
 // FOLLOW + SEARCH
 app.use("/api/follow", require("./routes/followRoutes"));
 app.use("/api/search", require("./routes/searchRoutes"));
+app.use("/api/family", require("./routes/familyPairingRoutes"));
 
 // VIBES
 app.use("/api/vibes", require("./routes/vibesRoutes"));

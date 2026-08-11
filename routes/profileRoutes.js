@@ -54,6 +54,14 @@ router.post(
     controller.requestVerification
 );
 
+router.post("/business-verification-request", auth, controller.requestBusinessVerification);
+
+router.post("/deactivate", auth, controller.deactivateAccount);
+
+router.post("/data-export-requests", auth, controller.createDataExportRequest);
+router.get("/data-export-requests", auth, controller.listDataExportRequests);
+router.get("/data-export-requests/:id/download", auth, controller.downloadDataExport);
+
 // ====================================
 // DELETE ACCOUNT
 // ====================================

@@ -55,9 +55,11 @@ const storySchema = new mongoose.Schema(
             audioId: { type: String, default: "" },
             audioStreamUrl: { type: String, default: "" },
             muted: { type: Boolean, default: false },
+            volume: { type: Number, default: 1, min: 0, max: 1 },
             playbackSpeed: { type: Number, default: 1, min: 0.5, max: 2 },
             trimStartMs: { type: Number, default: 0, min: 0 },
-            trimEndMs: { type: Number, default: 0, min: 0 }
+            trimEndMs: { type: Number, default: 0, min: 0 },
+            exportQuality: { type: String, enum: ["480P", "720P", "1080P"], default: "720P" }
         },
 
         likes: [

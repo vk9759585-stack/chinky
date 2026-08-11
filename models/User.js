@@ -116,6 +116,22 @@ const userSchema = new mongoose.Schema(
             default: "none"
         },
 
+        businessVerificationStatus: {
+            type: String,
+            enum: ["none", "pending", "verified", "rejected"],
+            default: "none"
+        },
+
+        isDeactivated: {
+            type: Boolean,
+            default: false
+        },
+
+        deactivatedAt: {
+            type: Date,
+            default: null
+        },
+
         followers: [
             {
                 type: mongoose.Schema.Types.ObjectId,

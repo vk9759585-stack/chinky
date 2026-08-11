@@ -120,6 +120,12 @@ exports.login = async (req, res) => {
             });
         }
 
+        if (user.isDeactivated) {
+            user.isDeactivated = false;
+            user.deactivatedAt = null;
+            await user.save();
+        }
+
         const token = jwt.sign(
             {
                 id: user._id

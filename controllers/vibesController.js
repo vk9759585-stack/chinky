@@ -29,9 +29,13 @@ const editFromBody = (value, fallbackFilter = "Original") => {
         audioId: String(raw.audioId || "").slice(0, 80),
         audioStreamUrl: String(raw.audioStreamUrl || "").slice(0, 2000),
         muted: raw.muted === true,
+        volume: number("volume", 1, 0, 1),
         playbackSpeed: number("playbackSpeed", 1, 0.5, 2),
         trimStartMs: Math.round(number("trimStartMs", 0, 0, 86400000)),
-        trimEndMs: Math.round(number("trimEndMs", 0, 0, 86400000))
+        trimEndMs: Math.round(number("trimEndMs", 0, 0, 86400000)),
+        exportQuality: ["480P", "720P", "1080P"].includes(String(raw.exportQuality || "720P").toUpperCase())
+            ? String(raw.exportQuality || "720P").toUpperCase()
+            : "720P"
     };
 };
 
@@ -44,14 +48,14 @@ exports.getVibes = async (req, res) => {
         const limit = Math.min(Math.max(Number(req.query.limit) || 40, 10), 60);
         const viewerId = req.user.id.toString();
         const vibes = await Vibes.find({ expiresAt: { $gt: new Date() } })
-            .populate("user", "name username profileImage verified isPrivate followers")
+            .populate("user", "name username profileImage verified isPrivate isDeactivated followers")
             .sort({ createdAt: -1 })
             .limit(limit * 2);
 
         const data = vibes
             .filter((vibe) => {
                 const owner = vibe.user;
-                if (!owner) return false;
+                if (!owner || owner.isDeactivated) return false;
                 return (
                     !owner.isPrivate ||
                     owner._id.toString() === viewerId ||
@@ -88,15 +92,17 @@ exports.createVibes = async (req, res) => {
         }
 
         const isVideo = req.file.mimetype.startsWith("video/");
+        const edit = editFromBody(req.body.edit, req.body.filter || "Original");
+        const qualityWidth = edit.exportQuality === "1080P" ? 1080 : edit.exportQuality === "480P" ? 480 : 720;
         try {
             const upload = await cloudinary.uploader.upload(req.file.path, {
                 resource_type: isVideo ? "video" : "image",
-                folder: "chinky/vibes"
+                folder: "chinky/vibes",
+                transformation: [{ width: qualityWidth, crop: "limit" }]
             });
 
             await fs.promises.unlink(req.file.path).catch(() => {});
 
-            const edit = editFromBody(req.body.edit, req.body.filter || "Original");
             const vibe = await Vibes.create({
                 user: req.user.id,
                 media: upload.secure_url,

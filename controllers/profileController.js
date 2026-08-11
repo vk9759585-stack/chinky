@@ -7,13 +7,22 @@ const Comment = require("../models/Comment");
 const VibesComment = require("../models/VibesComment");
 const Notification = require("../models/Notification");
 const Subscription = require("../models/Subscription");
+const DataExportRequest = require("../models/DataExportRequest");
+const Wallet = require("../models/Wallet");
+const WalletLedger = require("../models/WalletLedger");
+const Payment = require("../models/Payment");
+const WithdrawalRequest = require("../models/WithdrawalRequest");
+const UpiCoinRequest = require("../models/UpiCoinRequest");
+const SparkComment = require("../models/SparkComment");
+const LiveSession = require("../models/LiveSession");
+const ShopOrder = require("../models/ShopOrder");
 
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
 
 
 const canSeeOwner = (owner, viewerId) => {
-    if (!owner) return false;
+    if (!owner || owner.isDeactivated) return false;
     if (!owner.isPrivate) return true;
     if (owner._id.toString() === viewerId.toString()) return true;
     return Array.isArray(owner.followers) && owner.followers.some((id) => id.toString() === viewerId.toString());
@@ -50,7 +59,7 @@ const decorateSpark = (spark, viewerId) => {
 
 const contentPopulate = {
     path: "user",
-    select: "name username profileImage verified isPrivate followers"
+    select: "name username profileImage verified isPrivate isDeactivated followers"
 };
 
 // ======================================
@@ -199,9 +208,9 @@ exports.getPublicProfile = async (req, res) => {
     try {
         const viewerId = req.user.id;
         const user = await User.findById(req.params.id)
-            .select("name username bio link profileImage verified followers following accountType isPrivate");
+            .select("name username bio link profileImage verified followers following accountType isPrivate isDeactivated");
 
-        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        if (!user || user.isDeactivated) return res.status(404).json({ success: false, message: "User not found" });
 
         const isFollowing = user.followers.some((id) => id.toString() === viewerId.toString());
         const canView = !user.isPrivate || user._id.toString() === viewerId.toString() || isFollowing;
@@ -256,7 +265,7 @@ exports.getSavedPosts = async (req, res) => {
                 path: "savedPosts",
                 populate: {
                     path: "user",
-                    select: "name username profileImage verified isPrivate followers"
+                    select: "name username profileImage verified isPrivate isDeactivated followers"
                 },
                 options: { sort: { createdAt: -1 } }
             });
@@ -344,7 +353,8 @@ exports.deleteAccount = async (req, res) => {
                     { receiver: userId }
                 ]
             }),
-            Subscription.deleteMany({ user: userId })
+            Subscription.deleteMany({ user: userId }),
+            DataExportRequest.deleteMany({ user: userId })
         ]);
 
         await User.findByIdAndDelete(userId);
@@ -465,5 +475,177 @@ exports.updatePrivacySettings = async (req, res) => {
         return res.json({ success: true, data: { isPrivate: user.isPrivate, ...(user.privacySettings?.toObject?.() || user.privacySettings || {}) } });
     } catch (err) {
         return res.status(500).json({ success: false, message: "Could not save privacy settings" });
+    }
+};
+
+
+// ======================================
+// BUSINESS VERIFICATION
+// ======================================
+exports.requestBusinessVerification = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        user.accountType = "professional";
+        user.businessVerificationStatus = "pending";
+        await user.save();
+        return res.json({ success: true, message: "Business verification request submitted" });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// ======================================
+// DEACTIVATE ACCOUNT
+// ======================================
+exports.deactivateAccount = async (req, res) => {
+    try {
+        const user = await User.findByIdAndUpdate(
+            req.user.id,
+            { isDeactivated: true, deactivatedAt: new Date() },
+            { new: true }
+        ).select("_id isDeactivated deactivatedAt");
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        return res.json({ success: true, message: "Account deactivated" });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+const EXPORT_CATEGORIES = new Set([
+    "Comments", "Direct Messages", "Income + Wallet", "Likes and Favourites",
+    "Posts", "Profile and Settings", "Chinky LIVE", "Chinky Shop", "Your Activity"
+]);
+
+const scrub = (value) => JSON.parse(JSON.stringify(value));
+
+async function buildExportPayload(userId, categories) {
+    const payload = { generatedAt: new Date().toISOString(), categories: {} };
+    const wants = new Set(categories);
+
+    if (wants.has("Profile and Settings")) {
+        const user = await User.findById(userId).select("-password -otp -otpExpire").lean();
+        payload.categories["Profile and Settings"] = scrub(user || {});
+    }
+
+    if (wants.has("Posts")) {
+        const [posts, sparks, vibes] = await Promise.all([
+            Post.find({ user: userId }).lean(),
+            Spark.find({ user: userId }).lean(),
+            Vibes.find({ user: userId }).lean(),
+        ]);
+        payload.categories.Posts = { posts: scrub(posts), sparks: scrub(sparks), vibes: scrub(vibes) };
+    }
+
+    if (wants.has("Comments")) {
+        const [postComments, sparkComments, vibesComments] = await Promise.all([
+            Comment.find({ user: userId }).lean(),
+            SparkComment.find({ user: userId }).lean(),
+            VibesComment.find({ user: userId }).lean(),
+        ]);
+        payload.categories.Comments = { postComments: scrub(postComments), sparkComments: scrub(sparkComments), vibesComments: scrub(vibesComments) };
+    }
+
+    if (wants.has("Direct Messages")) {
+        const messages = await Chat.find({ $or: [{ sender: userId }, { receiver: userId }] }).lean();
+        payload.categories["Direct Messages"] = scrub(messages);
+    }
+
+    if (wants.has("Income + Wallet")) {
+        const [wallet, ledger, payments, withdrawals, upiRequests] = await Promise.all([
+            Wallet.findOne({ user: userId }).lean(),
+            WalletLedger.find({ user: userId }).sort({ createdAt: -1 }).lean(),
+            Payment.find({ user: userId }).sort({ createdAt: -1 }).lean(),
+            WithdrawalRequest.find({ user: userId }).sort({ createdAt: -1 }).lean(),
+            UpiCoinRequest.find({ user: userId }).sort({ createdAt: -1 }).lean(),
+        ]);
+        payload.categories["Income + Wallet"] = scrub({ wallet, ledger, payments, withdrawals, upiRequests });
+    }
+
+    if (wants.has("Likes and Favourites")) {
+        const [posts, sparks, user] = await Promise.all([
+            Post.find({ likes: userId }).select("_id createdAt").lean(),
+            Spark.find({ likes: userId }).select("_id createdAt").lean(),
+            User.findById(userId).select("savedPosts").lean(),
+        ]);
+        payload.categories["Likes and Favourites"] = scrub({ likedPosts: posts, likedSparks: sparks, savedPosts: user?.savedPosts || [] });
+    }
+
+    if (wants.has("Chinky LIVE")) {
+        const lives = await LiveSession.find({ hostUserId: userId }).sort({ startedAt: -1 }).lean();
+        payload.categories["Chinky LIVE"] = scrub(lives);
+    }
+
+    if (wants.has("Chinky Shop")) {
+        const orders = await ShopOrder.find({ user: userId }).sort({ createdAt: -1 }).lean();
+        payload.categories["Chinky Shop"] = scrub(orders);
+    }
+
+    if (wants.has("Your Activity")) {
+        const notifications = await Notification.find({ $or: [{ sender: userId }, { receiver: userId }] }).sort({ createdAt: -1 }).limit(1000).lean();
+        payload.categories["Your Activity"] = scrub({ notifications });
+    }
+
+    return payload;
+}
+
+exports.createDataExportRequest = async (req, res) => {
+    try {
+        const format = req.body.format === "json" ? "json" : "txt";
+        const categories = Array.isArray(req.body.categories)
+            ? [...new Set(req.body.categories.map(String).filter(v => EXPORT_CATEGORIES.has(v)))]
+            : [];
+        if (!categories.length) return res.status(400).json({ success: false, message: "Select at least one data category" });
+
+        const record = await DataExportRequest.create({ user: req.user.id, format, categories, status: "processing" });
+        try {
+            record.payload = await buildExportPayload(req.user.id, categories);
+            record.status = "ready";
+            record.readyAt = new Date();
+            record.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+            await record.save();
+        } catch (err) {
+            record.status = "failed";
+            await record.save();
+            throw err;
+        }
+        return res.status(201).json({ success: true, data: record });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.listDataExportRequests = async (req, res) => {
+    try {
+        const rows = await DataExportRequest.find({ user: req.user.id })
+            .select("format categories status readyAt expiresAt createdAt")
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .lean();
+        return res.json({ success: true, data: rows });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.downloadDataExport = async (req, res) => {
+    try {
+        const row = await DataExportRequest.findOne({ _id: req.params.id, user: req.user.id }).lean();
+        if (!row) return res.status(404).json({ success: false, message: "Export request not found" });
+        if (row.status !== "ready") return res.status(409).json({ success: false, message: "Export is not ready" });
+        if (row.expiresAt && new Date(row.expiresAt) < new Date()) return res.status(410).json({ success: false, message: "Export expired" });
+
+        if (row.format === "json") {
+            res.type("application/json");
+            return res.send(JSON.stringify(row.payload, null, 2));
+        }
+        const lines = ["Chinky Data Export", `Generated: ${row.payload?.generatedAt || row.readyAt}`, ""];
+        for (const [name, value] of Object.entries(row.payload?.categories || {})) {
+            lines.push(`===== ${name} =====`, JSON.stringify(value, null, 2), "");
+        }
+        res.type("text/plain");
+        return res.send(lines.join("\n"));
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
     }
 };

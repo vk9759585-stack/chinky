@@ -64,9 +64,13 @@ const editFromBody = (value, fallbackFilter = "Original") => {
         audioId: String(raw.audioId || "").slice(0, 80),
         audioStreamUrl: String(raw.audioStreamUrl || "").slice(0, 2000),
         muted: raw.muted === true,
+        volume: number("volume", 1, 0, 1),
         playbackSpeed: number("playbackSpeed", 1, 0.5, 2),
         trimStartMs: Math.round(number("trimStartMs", 0, 0, 86400000)),
-        trimEndMs: Math.round(number("trimEndMs", 0, 0, 86400000))
+        trimEndMs: Math.round(number("trimEndMs", 0, 0, 86400000)),
+        exportQuality: ["480P", "720P", "1080P"].includes(String(raw.exportQuality || "720P").toUpperCase())
+            ? String(raw.exportQuality || "720P").toUpperCase()
+            : "720P"
     };
 };
 
@@ -78,13 +82,16 @@ exports.createSpark = async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ success: false, message: "Spark video is required" });
 
+        const edit = editFromBody(req.body.edit, req.body.filter || "Original");
+        const qualityWidth = edit.exportQuality === "1080P" ? 1080 : edit.exportQuality === "480P" ? 480 : 720;
         let videoUrl = "";
         let videoPublicId = "";
         let thumbnail = (req.body.thumbnail || "").trim();
         try {
             const upload = await cloudinary.uploader.upload(req.file.path, {
                 resource_type: "video",
-                folder: "chinky/sparks"
+                folder: "chinky/sparks",
+                transformation: [{ width: qualityWidth, crop: "limit" }]
             });
             videoUrl = upload.secure_url;
             videoPublicId = upload.public_id || "";
@@ -94,7 +101,6 @@ exports.createSpark = async (req, res) => {
             videoUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
         }
 
-        const edit = editFromBody(req.body.edit, req.body.filter || "Original");
         const spark = await Spark.create({
             user: req.user.id,
             caption: req.body.caption || "",
@@ -157,7 +163,7 @@ exports.getSparks = async (req, res) => {
         // Fetch a small page instead of loading the whole Spark collection.
         // A little over-fetch helps after private-account filtering.
         const sparks = await Spark.find(filter)
-            .populate("user", "name username profileImage verified isPrivate followers")
+            .populate("user", "name username profileImage verified isPrivate isDeactivated followers")
             .populate("audio", "title artistName streamUrl duration coverUrl owner usageCount")
             .sort({ createdAt: -1 })
             .limit(limit * 2)
@@ -166,7 +172,7 @@ exports.getSparks = async (req, res) => {
         const visible = [];
         for (const spark of sparks) {
             const owner = spark.user;
-            if (!owner) continue;
+            if (!owner || owner.isDeactivated) continue;
             const followers = Array.isArray(owner.followers) ? owner.followers : [];
             const canView = !owner.isPrivate || owner._id.toString() === viewerId || followers.some((id) => id.toString() === viewerId);
             if (!canView) continue;

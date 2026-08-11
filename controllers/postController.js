@@ -2,6 +2,7 @@ const Post = require("../models/Post");
 const User = require("../models/User");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
+const Audio = require("../models/Audio");
 
 const listFromBody = (value) => {
     if (Array.isArray(value)) return value;
@@ -12,6 +13,40 @@ const listFromBody = (value) => {
     } catch (_) {
         return [];
     }
+};
+
+const editFromBody = (value, fallbackFilter = "Original") => {
+    let raw = value;
+    if (typeof raw === "string") {
+        try { raw = JSON.parse(raw); } catch (_) { raw = {}; }
+    }
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) raw = {};
+    const number = (key, fallback, min, max) => {
+        const parsed = Number(raw[key]);
+        return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
+    };
+    const requestedQuality = String(raw.exportQuality || "720P").toUpperCase();
+    return {
+        filter: String(raw.filter || fallbackFilter).slice(0, 30),
+        brightness: number("brightness", 0, -0.5, 0.5),
+        contrast: number("contrast", 1, 0.5, 1.8),
+        saturation: number("saturation", 1, 0, 2),
+        overlayText: String(raw.overlayText || "").trim().slice(0, 80),
+        overlayX: number("overlayX", 0.5, 0, 1),
+        overlayY: number("overlayY", 0.5, 0, 1),
+        sticker: String(raw.sticker || "").slice(0, 8),
+        stickerX: number("stickerX", 0.78, 0, 1),
+        stickerY: number("stickerY", 0.28, 0, 1),
+        audioTitle: String(raw.audioTitle || "Original audio").slice(0, 120),
+        audioId: String(raw.audioId || "").slice(0, 80),
+        audioStreamUrl: String(raw.audioStreamUrl || "").slice(0, 2000),
+        muted: raw.muted === true,
+        volume: number("volume", 1, 0, 1),
+        playbackSpeed: number("playbackSpeed", 1, 0.5, 2),
+        trimStartMs: Math.round(number("trimStartMs", 0, 0, 86400000)),
+        trimEndMs: Math.round(number("trimEndMs", 0, 0, 86400000)),
+        exportQuality: ["480P", "720P", "1080P"].includes(requestedQuality) ? requestedQuality : "720P"
+    };
 };
 
 const cloudinaryVideoThumbnail = (upload) => {
@@ -52,13 +87,16 @@ exports.createPost = async (req, res) => {
         const mediaType = req.file.mimetype.startsWith("video/")
             ? "video"
             : "image";
+        const edit = editFromBody(req.body.edit, req.body.filter || "Original");
+        const qualityWidth = edit.exportQuality === "1080P" ? 1080 : edit.exportQuality === "480P" ? 480 : 720;
 
         try {
             const result = await cloudinary.uploader.upload(
                 req.file.path,
                 {
                     resource_type: mediaType,
-                    folder: `chinky/posts/${mediaType}s`
+                    folder: `chinky/posts/${mediaType}s`,
+                    transformation: [{ width: qualityWidth, crop: "limit" }]
                 }
             );
 
@@ -68,10 +106,20 @@ exports.createPost = async (req, res) => {
                 thumbnail: mediaType === "video" ? cloudinaryVideoThumbnail(result) : result.secure_url,
                 mediaType,
                 caption: req.body.caption || "",
+                filter: edit.filter,
+                audioTitle: edit.audioTitle,
+                edit,
                 location: req.body.location || "",
                 taggedUsers: listFromBody(req.body.taggedUsers),
                 products: listFromBody(req.body.products)
             });
+
+            if (edit.audioId) {
+                await Audio.updateOne(
+                    { _id: edit.audioId, reusable: true, blocked: false },
+                    { $inc: { usageCount: 1 } }
+                ).catch(() => {});
+            }
 
             await removeTemporaryUpload(req.file.path);
 
@@ -111,7 +159,7 @@ exports.getFlow = async (req, res) => {
         const posts = await Post.find()
             .populate(
                 "user",
-                "name username profileImage verified isPrivate followers"
+                "name username profileImage verified isPrivate isDeactivated followers"
             )
             .sort({
                 createdAt: -1
@@ -122,7 +170,9 @@ exports.getFlow = async (req, res) => {
         const visiblePosts = posts.filter((post) => {
             const owner = post.user;
 
-            if (!owner || !owner.isPrivate) {
+            if (!owner || owner.isDeactivated) return false;
+
+            if (!owner.isPrivate) {
                 return true;
             }
 
