@@ -102,6 +102,7 @@ exports.createPost = async (req, res) => {
 
 exports.getFlow = async (req, res) => {
     try {
+        const limit = Math.min(Math.max(Number(req.query.limit) || 30, 10), 50);
         const viewerId =
             req.user.id ||
             req.user._id ||
@@ -114,7 +115,9 @@ exports.getFlow = async (req, res) => {
             )
             .sort({
                 createdAt: -1
-            });
+            })
+            // Over-fetch because private posts may be removed below.
+            .limit(limit * 2);
 
         const visiblePosts = posts.filter((post) => {
             const owner = post.user;
@@ -133,7 +136,7 @@ exports.getFlow = async (req, res) => {
             );
         });
 
-        const flow = visiblePosts.map((post) => {
+        const flow = visiblePosts.slice(0, limit).map((post) => {
             const data = post.toObject();
             const ownerFollowers = post.user?.followers || [];
             if (data.user?.followers) delete data.user.followers;

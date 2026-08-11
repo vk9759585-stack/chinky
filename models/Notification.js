@@ -27,7 +27,8 @@ const notificationSchema = new mongoose.Schema(
                 "spark_like",
                 "vibes_like",
                 "club_invite",
-                "verification"
+                "verification",
+                "support"
             ],
             required: true
         },

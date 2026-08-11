@@ -2,6 +2,38 @@ const Vibes = require("../models/Vibes");
 const VibesComment = require("../models/VibesComment");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
+const Audio = require("../models/Audio");
+
+const editFromBody = (value, fallbackFilter = "Original") => {
+    let raw = value;
+    if (typeof raw === "string") {
+        try { raw = JSON.parse(raw); } catch (_) { raw = {}; }
+    }
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) raw = {};
+    const number = (key, fallback, min, max) => {
+        const parsed = Number(raw[key]);
+        return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
+    };
+    return {
+        filter: String(raw.filter || fallbackFilter).slice(0, 30),
+        brightness: number("brightness", 0, -0.5, 0.5),
+        contrast: number("contrast", 1, 0.5, 1.8),
+        saturation: number("saturation", 1, 0, 2),
+        overlayText: String(raw.overlayText || "").trim().slice(0, 80),
+        overlayX: number("overlayX", 0.5, 0, 1),
+        overlayY: number("overlayY", 0.5, 0, 1),
+        sticker: String(raw.sticker || "").slice(0, 8),
+        stickerX: number("stickerX", 0.78, 0, 1),
+        stickerY: number("stickerY", 0.28, 0, 1),
+        audioTitle: String(raw.audioTitle || "Original audio").slice(0, 120),
+        audioId: String(raw.audioId || "").slice(0, 80),
+        audioStreamUrl: String(raw.audioStreamUrl || "").slice(0, 2000),
+        muted: raw.muted === true,
+        playbackSpeed: number("playbackSpeed", 1, 0.5, 2),
+        trimStartMs: Math.round(number("trimStartMs", 0, 0, 86400000)),
+        trimEndMs: Math.round(number("trimEndMs", 0, 0, 86400000))
+    };
+};
 
 // ======================================
 // GET VIBES
@@ -9,10 +41,12 @@ const fs = require("fs");
 
 exports.getVibes = async (req, res) => {
     try {
+        const limit = Math.min(Math.max(Number(req.query.limit) || 40, 10), 60);
         const viewerId = req.user.id.toString();
         const vibes = await Vibes.find({ expiresAt: { $gt: new Date() } })
             .populate("user", "name username profileImage verified isPrivate followers")
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .limit(limit * 2);
 
         const data = vibes
             .filter((vibe) => {
@@ -24,6 +58,7 @@ exports.getVibes = async (req, res) => {
                     owner.followers.some((id) => id.toString() === viewerId)
                 );
             })
+            .slice(0, limit)
             .map((vibe) => {
                 const item = vibe.toObject();
                 const ownerFollowers = vibe.user?.followers || [];
@@ -61,12 +96,23 @@ exports.createVibes = async (req, res) => {
 
             await fs.promises.unlink(req.file.path).catch(() => {});
 
+            const edit = editFromBody(req.body.edit, req.body.filter || "Original");
             const vibe = await Vibes.create({
                 user: req.user.id,
                 media: upload.secure_url,
                 isVideo,
-                caption: (req.body.caption || "").trim()
+                caption: (req.body.caption || "").trim(),
+                filter: edit.filter,
+                audioTitle: edit.audioTitle,
+                edit
             });
+
+            if (edit.audioId) {
+                await Audio.updateOne(
+                    { _id: edit.audioId, reusable: true, blocked: false },
+                    { $inc: { usageCount: 1 } }
+                ).catch(() => {});
+            }
 
             return res.status(201).json({ success: true, data: vibe });
         } catch (_) {

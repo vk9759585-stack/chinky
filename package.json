@@ -3,11 +3,15 @@
   "version": "1.0.0",
   "description": "Chinky Social Media Backend",
   "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "build": "npm run check:syntax && node smoke-tests/verify-website.js",
-    "check:syntax": "node --check server.js && node --check controllers/webController.js && node --check routes/webRoutes.js && node --check website/app.js && node --check smoke-tests/verify-website.js",
+    "build": "npm run audio:generate && npm run check:syntax && node smoke-tests/verify-support-ai.js && node smoke-tests/verify-audio-library.js && node smoke-tests/verify-website.js",
+    "audio:generate": "node scripts/generate-original-audio.js",
+    "check:syntax": "node --check server.js && node --check controllers/webController.js && node --check controllers/audioController.js && node --check controllers/sparkController.js && node --check controllers/vibesController.js && node --check controllers/supportController.js && node --check routes/webRoutes.js && node --check routes/supportRoutes.js && node --check data/audioCatalog.js && node --check data/supportKnowledgeBase.js && node --check services/supportAiService.js && node --check services/supportNotificationService.js && node --check services/supportMonitorService.js && node --check scripts/generate-original-audio.js && node --check smoke-tests/verify-support-ai.js && node --check smoke-tests/verify-audio-library.js && node --check website/app.js && node --check smoke-tests/verify-website.js",
     "smoke:health": "node smoke-tests/run-newman.js --folder Health",
     "smoke:full": "node smoke-tests/run-newman.js"
   },

@@ -30,6 +30,36 @@ const storySchema = new mongoose.Schema(
             default: ""
         },
 
+        filter: {
+            type: String,
+            default: "Original"
+        },
+
+        audioTitle: {
+            type: String,
+            default: "Original audio"
+        },
+
+        edit: {
+            filter: { type: String, default: "Original" },
+            brightness: { type: Number, default: 0, min: -0.5, max: 0.5 },
+            contrast: { type: Number, default: 1, min: 0.5, max: 1.8 },
+            saturation: { type: Number, default: 1, min: 0, max: 2 },
+            overlayText: { type: String, default: "", maxlength: 80 },
+            overlayX: { type: Number, default: 0.5, min: 0, max: 1 },
+            overlayY: { type: Number, default: 0.5, min: 0, max: 1 },
+            sticker: { type: String, default: "", maxlength: 8 },
+            stickerX: { type: Number, default: 0.78, min: 0, max: 1 },
+            stickerY: { type: Number, default: 0.28, min: 0, max: 1 },
+            audioTitle: { type: String, default: "Original audio", maxlength: 120 },
+            audioId: { type: String, default: "" },
+            audioStreamUrl: { type: String, default: "" },
+            muted: { type: Boolean, default: false },
+            playbackSpeed: { type: Number, default: 1, min: 0.5, max: 2 },
+            trimStartMs: { type: Number, default: 0, min: 0 },
+            trimEndMs: { type: Number, default: 0, min: 0 }
+        },
+
         likes: [
             {
                 type: mongoose.Schema.Types.ObjectId,

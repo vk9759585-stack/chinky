@@ -34,6 +34,42 @@ const listFromBody = (value) => {
     }
 };
 
+const absoluteMediaUrl = (req, value) => {
+    const url = String(value || "");
+    return url.startsWith("/") ? `${req.protocol}://${req.get("host")}${url}` : url;
+};
+
+const editFromBody = (value, fallbackFilter = "Original") => {
+    let raw = value;
+    if (typeof raw === "string") {
+        try { raw = JSON.parse(raw); } catch (_) { raw = {}; }
+    }
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) raw = {};
+    const number = (key, fallback, min, max) => {
+        const parsed = Number(raw[key]);
+        return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
+    };
+    return {
+        filter: String(raw.filter || fallbackFilter).slice(0, 30),
+        brightness: number("brightness", 0, -0.5, 0.5),
+        contrast: number("contrast", 1, 0.5, 1.8),
+        saturation: number("saturation", 1, 0, 2),
+        overlayText: String(raw.overlayText || "").trim().slice(0, 80),
+        overlayX: number("overlayX", 0.5, 0, 1),
+        overlayY: number("overlayY", 0.5, 0, 1),
+        sticker: String(raw.sticker || "").slice(0, 8),
+        stickerX: number("stickerX", 0.78, 0, 1),
+        stickerY: number("stickerY", 0.28, 0, 1),
+        audioTitle: String(raw.audioTitle || "Original audio").slice(0, 120),
+        audioId: String(raw.audioId || "").slice(0, 80),
+        audioStreamUrl: String(raw.audioStreamUrl || "").slice(0, 2000),
+        muted: raw.muted === true,
+        playbackSpeed: number("playbackSpeed", 1, 0.5, 2),
+        trimStartMs: Math.round(number("trimStartMs", 0, 0, 86400000)),
+        trimEndMs: Math.round(number("trimEndMs", 0, 0, 86400000))
+    };
+};
+
 // ======================================
 // CREATE SPARK
 // ======================================
@@ -58,6 +94,7 @@ exports.createSpark = async (req, res) => {
             videoUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
         }
 
+        const edit = editFromBody(req.body.edit, req.body.filter || "Original");
         const spark = await Spark.create({
             user: req.user.id,
             caption: req.body.caption || "",
@@ -67,6 +104,7 @@ exports.createSpark = async (req, res) => {
             music: req.body.music || "",
             audio: req.body.audioId || null,
             filter: req.body.filter || "Original",
+            edit,
             duration: Number(req.body.duration) || 0,
             hashtags: listFromBody(req.body.hashtags),
             location: req.body.location || "",
@@ -134,6 +172,7 @@ exports.getSparks = async (req, res) => {
             if (!canView) continue;
 
             const data = { ...spark, user: { ...owner } };
+            if (data.audio?.streamUrl) data.audio.streamUrl = absoluteMediaUrl(req, data.audio.streamUrl);
             data.creatorFollowerCount = followers.length;
             data.isFollowing = followers.some((id) => id.toString() === viewerId);
             data.liked = (spark.likes || []).some((id) => id.toString() === viewerId);

@@ -14,6 +14,7 @@ const connectDB = require("./config/db");
 // Initialize app
 const app = express();
 const websiteRoot = path.resolve(__dirname, "website");
+const audioLibraryRoot = path.resolve(__dirname, "audio-library");
 
 const isNonEmpty = (value) => typeof value === "string" && value.trim().length > 0;
 const isProd = process.env.NODE_ENV === "production";
@@ -105,6 +106,10 @@ app.use(express.urlencoded({ extended: true }));
 // Uploaded media always resolves from the backend directory, regardless of
 // whether the process is launched from the repository root or /backend.
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/audio-library", express.static(audioLibraryRoot, {
+  maxAge: isProd ? "30d" : 0,
+  immutable: isProd
+}));
 
 // =====================
 // DATABASE
@@ -398,6 +403,8 @@ const io = new Server(server, {
   },
 });
 app.set("io", io);
+
+require("./services/supportMonitorService").startSupportMonitor(app);
 
 require("./socket/socket")(io);
 require("./config/redisAdapter")(io).catch((error) => {
