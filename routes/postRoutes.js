@@ -19,10 +19,12 @@ router.get(
 // CREATE POST
 // ====================================
 
+router.get("/upload-status/:key", auth, controller.getUploadStatus);
+
 router.post(
     "/",
     auth,
-    upload.single("image"),
+    upload.fields([{ name: "image", maxCount: 1 }, { name: "overlay", maxCount: 1 }]),
     controller.createPost
 );
 

@@ -28,6 +28,10 @@ const editFromBody = (value, fallbackFilter = "Original") => {
     const requestedQuality = String(raw.exportQuality || "720P").toUpperCase();
     return {
         filter: String(raw.filter || fallbackFilter).slice(0, 30),
+<<<<<<< HEAD
+=======
+        effect: String(raw.effect || "None").slice(0, 30),
+>>>>>>> 91687b9 (Complete Chinky backend fixes)
         brightness: number("brightness", 0, -0.5, 0.5),
         contrast: number("contrast", 1, 0.5, 1.8),
         saturation: number("saturation", 1, 0, 2),
@@ -37,6 +41,14 @@ const editFromBody = (value, fallbackFilter = "Original") => {
         sticker: String(raw.sticker || "").slice(0, 8),
         stickerX: number("stickerX", 0.78, 0, 1),
         stickerY: number("stickerY", 0.28, 0, 1),
+<<<<<<< HEAD
+=======
+        overlayImageUrl: String(raw.overlayImageUrl || "").slice(0, 2000),
+        overlayImageX: number("overlayImageX", 0.5, 0, 1),
+        overlayImageY: number("overlayImageY", 0.45, 0, 1),
+        overlayImageScale: number("overlayImageScale", 0.38, 0.12, 0.9),
+        captionText: String(raw.captionText || "").trim().slice(0, 140),
+>>>>>>> 91687b9 (Complete Chinky backend fixes)
         audioTitle: String(raw.audioTitle || "Original audio").slice(0, 120),
         audioId: String(raw.audioId || "").slice(0, 80),
         audioStreamUrl: String(raw.audioStreamUrl || "").slice(0, 2000),
@@ -76,21 +88,35 @@ const removeTemporaryUpload = async (filePath) => {
 // ======================================
 
 exports.createPost = async (req, res) => {
+    const mediaFile = req.files?.image?.[0];
+    const overlayFile = req.files?.overlay?.[0];
+    const uploadKey = String(req.body.clientUploadId || "").trim().slice(0, 160);
     try {
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: "Media file is required"
-            });
+        if (uploadKey) {
+            const existing = await Post.findOne({ user: req.user.id, uploadKey });
+            if (existing) {
+                await removeTemporaryUpload(mediaFile?.path);
+                await removeTemporaryUpload(overlayFile?.path);
+                return res.status(200).json({ success: true, data: existing, duplicate: true });
+            }
+        }
+        if (!mediaFile) {
+            await removeTemporaryUpload(overlayFile?.path);
+            return res.status(400).json({ success: false, message: "Media file is required" });
         }
 
+<<<<<<< HEAD
         const mediaType = req.file.mimetype.startsWith("video/")
             ? "video"
             : "image";
+=======
+        const mediaType = mediaFile.mimetype.startsWith("video/") ? "video" : "image";
+>>>>>>> 91687b9 (Complete Chinky backend fixes)
         const edit = editFromBody(req.body.edit, req.body.filter || "Original");
         const qualityWidth = edit.exportQuality === "1080P" ? 1080 : edit.exportQuality === "480P" ? 480 : 720;
 
         try {
+<<<<<<< HEAD
             const result = await cloudinary.uploader.upload(
                 req.file.path,
                 {
@@ -99,9 +125,26 @@ exports.createPost = async (req, res) => {
                     transformation: [{ width: qualityWidth, crop: "limit" }]
                 }
             );
+=======
+            const result = await cloudinary.uploader.upload(mediaFile.path, {
+                resource_type: mediaType,
+                folder: `chinky/posts/${mediaType}s`,
+                transformation: [{ width: qualityWidth, crop: "limit" }]
+            });
+
+            if (overlayFile) {
+                const overlayUpload = await cloudinary.uploader.upload(overlayFile.path, {
+                    resource_type: "image",
+                    folder: "chinky/overlays",
+                    transformation: [{ width: 1200, crop: "limit" }]
+                });
+                edit.overlayImageUrl = overlayUpload.secure_url || "";
+            }
+>>>>>>> 91687b9 (Complete Chinky backend fixes)
 
             const post = await Post.create({
                 user: req.user.id,
+                uploadKey,
                 image: result.secure_url,
                 thumbnail: mediaType === "video" ? cloudinaryVideoThumbnail(result) : result.secure_url,
                 mediaType,
@@ -120,27 +163,41 @@ exports.createPost = async (req, res) => {
                     { $inc: { usageCount: 1 } }
                 ).catch(() => {});
             }
+<<<<<<< HEAD
 
             await removeTemporaryUpload(req.file.path);
+=======
+>>>>>>> 91687b9 (Complete Chinky backend fixes)
 
-            return res.status(201).json({
-                success: true,
-                data: post
-            });
-        } catch (error) {
-            await removeTemporaryUpload(req.file.path);
+            await removeTemporaryUpload(mediaFile.path);
+            await removeTemporaryUpload(overlayFile?.path);
+            return res.status(201).json({ success: true, data: post });
+        } catch (_) {
+            await removeTemporaryUpload(mediaFile.path);
+            await removeTemporaryUpload(overlayFile?.path);
             return res.status(502).json({
                 success: false,
                 message: "Media could not be stored. Please try uploading again."
             });
         }
-
     } catch (err) {
+        await removeTemporaryUpload(mediaFile?.path);
+        await removeTemporaryUpload(overlayFile?.path);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
 
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
+exports.getUploadStatus = async (req, res) => {
+    try {
+        res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.set("Pragma", "no-cache");
+        res.set("Expires", "0");
+        const uploadKey = String(req.params.key || "").trim();
+        if (!uploadKey) return res.json({ success: true, found: false });
+        const item = await Post.findOne({ user: req.user.id, uploadKey }).select("_id").lean();
+        return res.json({ success: true, found: Boolean(item), id: item?._id || null });
+    } catch (_) {
+        return res.status(500).json({ success: false, found: false });
     }
 };
 
@@ -150,6 +207,9 @@ exports.createPost = async (req, res) => {
 
 exports.getFlow = async (req, res) => {
     try {
+        res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.set("Pragma", "no-cache");
+        res.set("Expires", "0");
         const limit = Math.min(Math.max(Number(req.query.limit) || 30, 10), 50);
         const viewerId =
             req.user.id ||

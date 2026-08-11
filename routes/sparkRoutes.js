@@ -12,11 +12,13 @@ const sparkController = require("../controllers/sparkController");
 // SPARK ROUTES
 // ====================================
 
+router.get("/upload-status/:key", authMiddleware, sparkController.getUploadStatus);
+
 // POST /sparks -> Create a new spark (with video upload)
 router.post(
   "/",
   authMiddleware,
-  upload.single("video"),
+  upload.fields([{ name: "video", maxCount: 1 }, { name: "overlay", maxCount: 1 }]),
   sparkController.createSpark
 );
 

@@ -5,7 +5,8 @@ const upload = require("../config/multerConfig");
 const controller = require("../controllers/vibesController");
 
 router.get("/", auth, controller.getVibes);
-router.post("/upload", auth, upload.single("story"), controller.createVibes);
+router.get("/upload-status/:key", auth, controller.getUploadStatus);
+router.post("/upload", auth, upload.fields([{ name: "story", maxCount: 1 }, { name: "overlay", maxCount: 1 }]), controller.createVibes);
 
 router.put("/:id/like", auth, controller.likeVibes);
 router.put("/:id/share", auth, controller.shareVibes);

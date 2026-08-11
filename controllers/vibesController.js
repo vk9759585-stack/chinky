@@ -16,6 +16,7 @@ const editFromBody = (value, fallbackFilter = "Original") => {
     };
     return {
         filter: String(raw.filter || fallbackFilter).slice(0, 30),
+        effect: String(raw.effect || "None").slice(0, 30),
         brightness: number("brightness", 0, -0.5, 0.5),
         contrast: number("contrast", 1, 0.5, 1.8),
         saturation: number("saturation", 1, 0, 2),
@@ -25,6 +26,11 @@ const editFromBody = (value, fallbackFilter = "Original") => {
         sticker: String(raw.sticker || "").slice(0, 8),
         stickerX: number("stickerX", 0.78, 0, 1),
         stickerY: number("stickerY", 0.28, 0, 1),
+        overlayImageUrl: String(raw.overlayImageUrl || "").slice(0, 2000),
+        overlayImageX: number("overlayImageX", 0.5, 0, 1),
+        overlayImageY: number("overlayImageY", 0.45, 0, 1),
+        overlayImageScale: number("overlayImageScale", 0.38, 0.12, 0.9),
+        captionText: String(raw.captionText || "").trim().slice(0, 140),
         audioTitle: String(raw.audioTitle || "Original audio").slice(0, 120),
         audioId: String(raw.audioId || "").slice(0, 80),
         audioStreamUrl: String(raw.audioStreamUrl || "").slice(0, 2000),
@@ -86,25 +92,52 @@ exports.getVibes = async (req, res) => {
 // ======================================
 
 exports.createVibes = async (req, res) => {
+    const mediaFile = req.files?.story?.[0];
+    const overlayFile = req.files?.overlay?.[0];
+    const uploadKey = String(req.body.clientUploadId || "").trim().slice(0, 160);
     try {
-        if (!req.file) {
+        if (uploadKey) {
+            const existing = await Vibes.findOne({ user: req.user.id, uploadKey });
+            if (existing) {
+                await fs.promises.unlink(mediaFile?.path || "").catch(() => {});
+                await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
+                return res.status(200).json({ success: true, data: existing, duplicate: true });
+            }
+        }
+        if (!mediaFile) {
+            await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
             return res.status(400).json({ success: false, message: "Vibes media is required" });
         }
 
+<<<<<<< HEAD
         const isVideo = req.file.mimetype.startsWith("video/");
+=======
+        const isVideo = mediaFile.mimetype.startsWith("video/");
+>>>>>>> 91687b9 (Complete Chinky backend fixes)
         const edit = editFromBody(req.body.edit, req.body.filter || "Original");
         const qualityWidth = edit.exportQuality === "1080P" ? 1080 : edit.exportQuality === "480P" ? 480 : 720;
         try {
-            const upload = await cloudinary.uploader.upload(req.file.path, {
+            const upload = await cloudinary.uploader.upload(mediaFile.path, {
                 resource_type: isVideo ? "video" : "image",
                 folder: "chinky/vibes",
                 transformation: [{ width: qualityWidth, crop: "limit" }]
             });
 
-            await fs.promises.unlink(req.file.path).catch(() => {});
+            if (overlayFile) {
+                const overlayUpload = await cloudinary.uploader.upload(overlayFile.path, {
+                    resource_type: "image",
+                    folder: "chinky/overlays",
+                    transformation: [{ width: 1200, crop: "limit" }]
+                });
+                edit.overlayImageUrl = overlayUpload.secure_url || "";
+            }
+
+            await fs.promises.unlink(mediaFile.path).catch(() => {});
+            await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
 
             const vibe = await Vibes.create({
                 user: req.user.id,
+                uploadKey,
                 media: upload.secure_url,
                 isVideo,
                 caption: (req.body.caption || "").trim(),
@@ -122,14 +155,28 @@ exports.createVibes = async (req, res) => {
 
             return res.status(201).json({ success: true, data: vibe });
         } catch (_) {
-            await fs.promises.unlink(req.file.path).catch(() => {});
-            return res.status(502).json({
-                success: false,
-                message: "Vibes media could not be stored. Please retry."
-            });
+            await fs.promises.unlink(mediaFile.path).catch(() => {});
+            await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
+            return res.status(502).json({ success: false, message: "Vibes media could not be stored. Please retry." });
         }
     } catch (err) {
+        await fs.promises.unlink(mediaFile?.path || "").catch(() => {});
+        await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
         return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.getUploadStatus = async (req, res) => {
+    try {
+        res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.set("Pragma", "no-cache");
+        res.set("Expires", "0");
+        const uploadKey = String(req.params.key || "").trim();
+        if (!uploadKey) return res.json({ success: true, found: false });
+        const item = await Vibes.findOne({ user: req.user.id, uploadKey }).select("_id").lean();
+        return res.json({ success: true, found: Boolean(item), id: item?._id || null });
+    } catch (_) {
+        return res.status(500).json({ success: false, found: false });
     }
 };
 

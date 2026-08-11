@@ -135,7 +135,18 @@ exports.updateProfile = async (req, res) => {
         if (typeof link === "string") updates.link = link.trim();
 
         if (typeof email === "string") {
-            updates.email = email.trim().toLowerCase();
+            const normalizedEmail = email.trim().toLowerCase();
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+                return res.status(400).json({ success: false, message: "Enter a valid email address" });
+            }
+            const emailOwner = await User.findOne({
+                email: normalizedEmail,
+                _id: { $ne: req.user.id }
+            }).select("_id").lean();
+            if (emailOwner) {
+                return res.status(409).json({ success: false, message: "Email is already in use" });
+            }
+            updates.email = normalizedEmail;
         }
 
         if (typeof phone === "string") {
