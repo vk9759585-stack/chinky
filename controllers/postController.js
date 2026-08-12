@@ -28,10 +28,14 @@ const editFromBody = (value, fallbackFilter = "Original") => {
     const requestedQuality = String(raw.exportQuality || "720P").toUpperCase();
     return {
         filter: String(raw.filter || fallbackFilter).slice(0, 30),
+<<<<<<< Updated upstream
 <<<<<<< HEAD
 =======
         effect: String(raw.effect || "None").slice(0, 30),
 >>>>>>> 91687b9 (Complete Chinky backend fixes)
+=======
+        effect: String(raw.effect || "None").slice(0, 30),
+>>>>>>> Stashed changes
         brightness: number("brightness", 0, -0.5, 0.5),
         contrast: number("contrast", 1, 0.5, 1.8),
         saturation: number("saturation", 1, 0, 2),
@@ -41,14 +45,20 @@ const editFromBody = (value, fallbackFilter = "Original") => {
         sticker: String(raw.sticker || "").slice(0, 8),
         stickerX: number("stickerX", 0.78, 0, 1),
         stickerY: number("stickerY", 0.28, 0, 1),
+<<<<<<< Updated upstream
 <<<<<<< HEAD
 =======
+=======
+>>>>>>> Stashed changes
         overlayImageUrl: String(raw.overlayImageUrl || "").slice(0, 2000),
         overlayImageX: number("overlayImageX", 0.5, 0, 1),
         overlayImageY: number("overlayImageY", 0.45, 0, 1),
         overlayImageScale: number("overlayImageScale", 0.38, 0.12, 0.9),
         captionText: String(raw.captionText || "").trim().slice(0, 140),
+<<<<<<< Updated upstream
 >>>>>>> 91687b9 (Complete Chinky backend fixes)
+=======
+>>>>>>> Stashed changes
         audioTitle: String(raw.audioTitle || "Original audio").slice(0, 120),
         audioId: String(raw.audioId || "").slice(0, 80),
         audioStreamUrl: String(raw.audioStreamUrl || "").slice(0, 2000),
@@ -105,6 +115,7 @@ exports.createPost = async (req, res) => {
             return res.status(400).json({ success: false, message: "Media file is required" });
         }
 
+<<<<<<< Updated upstream
 <<<<<<< HEAD
         const mediaType = req.file.mimetype.startsWith("video/")
             ? "video"
@@ -112,10 +123,14 @@ exports.createPost = async (req, res) => {
 =======
         const mediaType = mediaFile.mimetype.startsWith("video/") ? "video" : "image";
 >>>>>>> 91687b9 (Complete Chinky backend fixes)
+=======
+        const mediaType = mediaFile.mimetype.startsWith("video/") ? "video" : "image";
+>>>>>>> Stashed changes
         const edit = editFromBody(req.body.edit, req.body.filter || "Original");
         const qualityWidth = edit.exportQuality === "1080P" ? 1080 : edit.exportQuality === "480P" ? 480 : 720;
 
         try {
+<<<<<<< Updated upstream
 <<<<<<< HEAD
             const result = await cloudinary.uploader.upload(
                 req.file.path,
@@ -126,6 +141,8 @@ exports.createPost = async (req, res) => {
                 }
             );
 =======
+=======
+>>>>>>> Stashed changes
             const result = await cloudinary.uploader.upload(mediaFile.path, {
                 resource_type: mediaType,
                 folder: `chinky/posts/${mediaType}s`,
@@ -140,7 +157,10 @@ exports.createPost = async (req, res) => {
                 });
                 edit.overlayImageUrl = overlayUpload.secure_url || "";
             }
+<<<<<<< Updated upstream
 >>>>>>> 91687b9 (Complete Chinky backend fixes)
+=======
+>>>>>>> Stashed changes
 
             const post = await Post.create({
                 user: req.user.id,
@@ -163,12 +183,16 @@ exports.createPost = async (req, res) => {
                     { $inc: { usageCount: 1 } }
                 ).catch(() => {});
             }
+<<<<<<< Updated upstream
 <<<<<<< HEAD
 
             await removeTemporaryUpload(req.file.path);
 =======
 >>>>>>> 91687b9 (Complete Chinky backend fixes)
 
+=======
+
+>>>>>>> Stashed changes
             await removeTemporaryUpload(mediaFile.path);
             await removeTemporaryUpload(overlayFile?.path);
             return res.status(201).json({ success: true, data: post });
