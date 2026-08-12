@@ -109,11 +109,7 @@ exports.createVibes = async (req, res) => {
             return res.status(400).json({ success: false, message: "Vibes media is required" });
         }
 
-<<<<<<< HEAD
-        const isVideo = req.file.mimetype.startsWith("video/");
-=======
         const isVideo = mediaFile.mimetype.startsWith("video/");
->>>>>>> 91687b9 (Complete Chinky backend fixes)
         const edit = editFromBody(req.body.edit, req.body.filter || "Original");
         const qualityWidth = edit.exportQuality === "1080P" ? 1080 : edit.exportQuality === "480P" ? 480 : 720;
         try {

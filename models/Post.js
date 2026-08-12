@@ -43,10 +43,7 @@ const postSchema = new mongoose.Schema(
 
         edit: {
             filter: { type: String, default: "Original" },
-<<<<<<< HEAD
-=======
             effect: { type: String, default: "None", maxlength: 30 },
->>>>>>> 91687b9 (Complete Chinky backend fixes)
             brightness: { type: Number, default: 0, min: -0.5, max: 0.5 },
             contrast: { type: Number, default: 1, min: 0.5, max: 1.8 },
             saturation: { type: Number, default: 1, min: 0, max: 2 },
@@ -56,14 +53,11 @@ const postSchema = new mongoose.Schema(
             sticker: { type: String, default: "", maxlength: 8 },
             stickerX: { type: Number, default: 0.78, min: 0, max: 1 },
             stickerY: { type: Number, default: 0.28, min: 0, max: 1 },
-<<<<<<< HEAD
-=======
             overlayImageUrl: { type: String, default: "" },
             overlayImageX: { type: Number, default: 0.5, min: 0, max: 1 },
             overlayImageY: { type: Number, default: 0.45, min: 0, max: 1 },
             overlayImageScale: { type: Number, default: 0.38, min: 0.12, max: 0.9 },
             captionText: { type: String, default: "", maxlength: 140 },
->>>>>>> 91687b9 (Complete Chinky backend fixes)
             audioTitle: { type: String, default: "Original audio", maxlength: 120 },
             audioId: { type: String, default: "" },
             audioStreamUrl: { type: String, default: "" },
