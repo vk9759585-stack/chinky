@@ -334,13 +334,13 @@ function renderPublicDocumentPage(route, document) {
   const markdown = fs.readFileSync(path.join(__dirname, document.file), "utf8");
   const canonicalUrl = `https://chinkyapp.com${route}`;
   return `<!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="${escapeHtml(document.description)}" />
     <meta name="robots" content="index, follow" />
-    <meta name="theme-color" content="#f8f8fb" />
+    <meta name="theme-color" content="#101017" />
     <link rel="canonical" href="${canonicalUrl}" />
     <link rel="icon" type="image/png" href="/assets/chinky-logo.png" />
     <link rel="stylesheet" href="/styles.css" />
@@ -385,6 +385,48 @@ app.get(Object.keys(publicDocuments), (req, res, next) => {
   } catch (error) {
     return next(error);
   }
+});
+
+
+const sharePage = ({ title, description, canonicalUrl, imageUrl = "https://chinkyapp.com/assets/chinky-logo.png" }) => `<!doctype html>
+<html lang="en" data-theme="dark"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(description)}">
+<meta property="og:type" content="website"><meta property="og:site_name" content="CHINKY">
+<meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}">
+<meta property="og:url" content="${escapeHtml(canonicalUrl)}"><meta property="og:image" content="${escapeHtml(imageUrl)}">
+<meta name="twitter:card" content="summary_large_image"><link rel="canonical" href="${escapeHtml(canonicalUrl)}">
+<meta name="theme-color" content="#000000"><link rel="stylesheet" href="/styles.css"></head>
+<body><main class="legal-page-main"><article class="legal-page-card"><a class="brand" href="/"><img src="/assets/chinky-logo.png" alt=""><span>CHINKY</span></a><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p><a class="button" href="/">Open CHINKY</a></article></main></body></html>`;
+
+app.get("/spark/:id", async (req, res, next) => {
+  try {
+    const Spark = require("./models/Spark");
+    const spark = await Spark.findById(req.params.id).populate("user", "username name").lean();
+    if (!spark) return res.status(404).send("Spark not found");
+    const creator = spark.user?.username ? `@${spark.user.username}` : "CHINKY creator";
+    const description = spark.caption || `Watch this Spark from ${creator} on CHINKY.`;
+    return res.send(sharePage({title:`${creator} on CHINKY`, description, canonicalUrl:`https://chinkyapp.com/spark/${spark._id}`, imageUrl:spark.thumbnail || "https://chinkyapp.com/assets/chinky-logo.png"}));
+  } catch (e) { return next(e); }
+});
+app.get("/p/:id", async (req, res, next) => {
+  try {
+    const Post = require("./models/Post");
+    const post = await Post.findById(req.params.id).populate("user", "username name").lean();
+    if (!post) return res.status(404).send("Post not found");
+    const creator = post.user?.username ? `@${post.user.username}` : "CHINKY creator";
+    const description = post.caption || `See this post from ${creator} on CHINKY.`;
+    return res.send(sharePage({title:`${creator} on CHINKY`, description, canonicalUrl:`https://chinkyapp.com/p/${post._id}`, imageUrl:post.thumbnail || post.image || "https://chinkyapp.com/assets/chinky-logo.png"}));
+  } catch (e) { return next(e); }
+});
+app.get("/@:username", async (req, res, next) => {
+  try {
+    const User = require("./models/User");
+    const user = await User.findOne({username:req.params.username.toLowerCase()}).lean();
+    if (!user) return res.status(404).send("Profile not found");
+    const description = user.bio || `Follow @${user.username} on CHINKY.`;
+    return res.send(sharePage({title:`@${user.username} • CHINKY`, description, canonicalUrl:`https://chinkyapp.com/@${encodeURIComponent(user.username)}`, imageUrl:user.profileImage || "https://chinkyapp.com/assets/chinky-logo.png"}));
+  } catch (e) { return next(e); }
 });
 
 app.get("/", (req, res) => {

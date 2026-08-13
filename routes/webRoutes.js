@@ -12,11 +12,6 @@ router.get("/auth/session", web.browserAuth, web.session);
 router.post("/auth/logout", web.sameOrigin, web.logout);
 router.post("/waitlist", web.sameOrigin, web.joinWaitlist);
 
-router.get("/spark/:id", web.sparkSharePage);
-router.get("/p/:id", web.postSharePage);
-router.get("/vibes/:id", web.vibesSharePage);
-router.get("/@:username", web.profileSharePage);
-
 router.get("/web/profile", web.browserAuth, profile.getProfile);
 router.get("/web/feed", web.browserAuth, posts.getFlow);
 router.get("/web/sparks", web.browserAuth, sparks.getSparks);
