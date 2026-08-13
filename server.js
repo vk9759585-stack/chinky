@@ -334,13 +334,13 @@ function renderPublicDocumentPage(route, document) {
   const markdown = fs.readFileSync(path.join(__dirname, document.file), "utf8");
   const canonicalUrl = `https://chinkyapp.com${route}`;
   return `<!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="${escapeHtml(document.description)}" />
     <meta name="robots" content="index, follow" />
-    <meta name="theme-color" content="#101017" />
+    <meta name="theme-color" content="#f8f8fb" />
     <link rel="canonical" href="${canonicalUrl}" />
     <link rel="icon" type="image/png" href="/assets/chinky-logo.png" />
     <link rel="stylesheet" href="/styles.css" />
