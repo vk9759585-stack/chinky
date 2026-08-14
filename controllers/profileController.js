@@ -449,6 +449,45 @@ const PRIVACY_BOOLEANS = [
     "displayProfileWhenSharingLinks", "videoDownloads", "viewerHistory"
 ];
 
+
+// ======================================
+// APP SETTINGS (cross-device preferences)
+// ======================================
+const SAFE_SETTING_KEY = /^[a-zA-Z0-9_]{1,80}$/;
+
+exports.getAppSettings = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select("appSettings").lean();
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        return res.json({ success: true, data: user.appSettings || {} });
+    } catch (_) {
+        return res.status(500).json({ success: false, message: "Could not load settings" });
+    }
+};
+
+exports.updateAppSettings = async (req, res) => {
+    try {
+        const changes = req.body?.changes;
+        if (!changes || typeof changes !== "object" || Array.isArray(changes)) {
+            return res.status(400).json({ success: false, message: "changes must be an object" });
+        }
+        const entries = Object.entries(changes);
+        if (entries.length > 50) return res.status(400).json({ success: false, message: "Too many settings" });
+        const set = {};
+        for (const [key, value] of entries) {
+            if (!SAFE_SETTING_KEY.test(key)) return res.status(400).json({ success: false, message: `Invalid setting key: ${key}` });
+            const valid = value === null || ["boolean","string","number"].includes(typeof value) || (Array.isArray(value) && value.length <= 100);
+            if (!valid) return res.status(400).json({ success: false, message: `Invalid value for ${key}` });
+            set[`appSettings.${key}`] = value;
+        }
+        const user = await User.findByIdAndUpdate(req.user.id, { $set: set }, { new: true, runValidators: true }).select("appSettings").lean();
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        return res.json({ success: true, data: user.appSettings || {} });
+    } catch (_) {
+        return res.status(500).json({ success: false, message: "Could not save settings" });
+    }
+};
+
 exports.getPrivacySettings = async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select("isPrivate privacySettings");

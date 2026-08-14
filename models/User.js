@@ -82,6 +82,11 @@ const userSchema = new mongoose.Schema(
             default: false
         },
 
+        appSettings: {
+            type: mongoose.Schema.Types.Mixed,
+            default: {}
+        },
+
         privacySettings: {
             comments: { type: String, enum: ["everyone", "friends", "no_one"], default: "everyone" },
             creatorCareMode: { type: Boolean, default: false },

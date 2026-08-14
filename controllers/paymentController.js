@@ -1,7 +1,7 @@
 const razorpay = require("../config/razorpay");
 const crypto = require('crypto');
 const Payment = require('../models/Payment');
-const { getCoinPackage, quoteCustomCoins, CUSTOM_COIN_MIN, CUSTOM_COIN_MAX } = require('../config/monetization');
+const { getCoinPackage, quoteCustomCoins, CUSTOM_COIN_MIN, CUSTOM_COIN_MAX, withPurchaseFee } = require('../config/monetization');
 const { changeCoins, getOrCreateWallet, runFinancialTransaction } = require('../services/walletAccountingService');
 
 const paymentUnavailable = (res) => {
@@ -36,11 +36,12 @@ exports.createCoinOrder = async (req, res) => {
     try {
         const requestedPackageId = String(req.body.packageId || '');
         const customCoins = req.body.customCoins;
-        const coinPackage = requestedPackageId ? getCoinPackage(requestedPackageId) : quoteCustomCoins(customCoins);
+        const rawCoinPackage = requestedPackageId ? getCoinPackage(requestedPackageId) : quoteCustomCoins(customCoins);
+        const coinPackage = rawCoinPackage ? withPurchaseFee(rawCoinPackage) : null;
         if (!coinPackage) return res.status(400).json({ success: false, message: 'Invalid coin package or custom coin amount.' });
 
         const order = await razorpay.orders.create({
-            amount: coinPackage.amountPaise,
+            amount: coinPackage.totalAmountPaise,
             currency: 'INR',
             receipt: `coins_${req.user.id}_${Date.now()}`.slice(0, 40),
             notes: {
@@ -53,7 +54,7 @@ exports.createCoinOrder = async (req, res) => {
         await Payment.create({
             user: req.user.id,
             orderId: order.id,
-            amount: coinPackage.amountPaise,
+            amount: coinPackage.totalAmountPaise,
             currency: 'INR',
             purpose: 'coins',
             packageId: coinPackage.id,
@@ -64,7 +65,9 @@ exports.createCoinOrder = async (req, res) => {
             success: true,
             data: {
                 orderId: order.id,
-                amountPaise: coinPackage.amountPaise,
+                baseAmountPaise: coinPackage.baseAmountPaise,
+                serviceFeePaise: coinPackage.serviceFeePaise,
+                amountPaise: coinPackage.totalAmountPaise,
                 currency: 'INR',
                 packageId: coinPackage.id,
                 coins: coinPackage.coins,
@@ -245,8 +248,8 @@ exports.createUpiCoinRequest = async (req,res)=>{
     if(!coinPackage) return res.status(400).json({success:false,message:'Invalid coin package.'});
     if(!/^[a-z0-9._-]{2,}@[a-z0-9.-]{2,}$/i.test(upiId)) return res.status(400).json({success:false,message:'Enter a valid UPI ID.'});
     const UpiCoinRequest=require('../models/UpiCoinRequest');
-    const row=await UpiCoinRequest.create({user:req.user.id,packageId:coinPackage.id,upiId,amountPaise:coinPackage.amountPaise,coins:coinPackage.coins});
-    return res.status(201).json({success:true,data:{id:row._id,status:row.status,amountPaise:row.amountPaise,coins:row.coins}});
+    const pricedPackage=withPurchaseFee(coinPackage); const row=await UpiCoinRequest.create({user:req.user.id,packageId:pricedPackage.id,upiId,baseAmountPaise:pricedPackage.baseAmountPaise,serviceFeePaise:pricedPackage.serviceFeePaise,amountPaise:pricedPackage.totalAmountPaise,coins:pricedPackage.coins});
+    return res.status(201).json({success:true,data:{id:row._id,status:row.status,baseAmountPaise:row.baseAmountPaise,serviceFeePaise:row.serviceFeePaise,amountPaise:row.amountPaise,coins:row.coins}});
   }catch(e){ return res.status(500).json({success:false,message:'UPI request could not be created.'}); }
 };
 exports.getMyUpiCoinRequests = async (req,res)=>{

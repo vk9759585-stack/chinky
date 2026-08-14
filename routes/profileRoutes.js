@@ -12,6 +12,9 @@ router.get("/", auth, controller.getProfile);
 
 router.put("/", auth, controller.updateProfile);
 
+router.get("/settings", auth, controller.getAppSettings);
+router.put("/settings", auth, controller.updateAppSettings);
+
 router.get("/privacy", auth, controller.getPrivacySettings);
 router.put("/privacy", auth, controller.updatePrivacySettings);
 
