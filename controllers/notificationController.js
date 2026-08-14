@@ -1,3 +1,4 @@
+const User = require("../models/User");
 const Notification = require("../models/Notification");
 
 // =====================================
@@ -137,6 +138,45 @@ exports.unreadCount = async (req, res) => {
     const userId = req.user.id || req.user._id || req.user.userId;
     const count = await Notification.countDocuments({ receiver: userId, isRead: false });
     return res.json({ success: true, count });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+// =====================================
+// REGISTER / REMOVE PUSH DEVICE TOKEN
+// =====================================
+
+exports.registerDeviceToken = async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    const token = String(req.body.token || "").trim();
+    if (token.length < 20 || token.length > 4096) {
+      return res.status(400).json({ success: false, message: "Invalid device token" });
+    }
+
+    const user = await User.findById(userId).select("+fcmTokens");
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    const existing = Array.isArray(user.fcmTokens) ? user.fcmTokens : [];
+    user.fcmTokens = [token, ...existing.filter((item) => item !== token)].slice(0, 10);
+    await user.save();
+
+    return res.json({ success: true, message: "Push device registered" });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.removeDeviceToken = async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    const token = String(req.body.token || "").trim();
+    if (!token) return res.status(400).json({ success: false, message: "Device token is required" });
+
+    await User.updateOne({ _id: userId }, { $pull: { fcmTokens: token } });
+    return res.json({ success: true, message: "Push device removed" });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

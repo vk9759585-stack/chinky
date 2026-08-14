@@ -429,6 +429,15 @@ app.get("/@:username", async (req, res, next) => {
   } catch (e) { return next(e); }
 });
 
+const defaultAndroidDownloadUrl = "https://play.google.com/store/apps/details?id=com.chinky.social";
+
+app.get("/download", (req, res) => {
+  const configuredUrl = String(process.env.CHINKY_APP_DOWNLOAD_URL || "").trim();
+  const downloadUrl = configuredUrl || defaultAndroidDownloadUrl;
+  res.set("Cache-Control", "no-store");
+  return res.redirect(302, downloadUrl);
+});
+
 app.get("/", (req, res) => {
   res.set("Cache-Control", "no-cache");
   return res.sendFile(path.join(websiteRoot, "index.html"));

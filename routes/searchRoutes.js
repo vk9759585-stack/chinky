@@ -13,4 +13,10 @@ router.get(
     controller.search
 );
 
+router.post(
+    "/contacts",
+    auth,
+    controller.matchContacts
+);
+
 module.exports = router;

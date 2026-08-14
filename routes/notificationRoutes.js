@@ -16,6 +16,10 @@ router.post(
     controller.createNotification
 );
 
+
+router.post("/device-token", auth, controller.registerDeviceToken);
+router.post("/device-token/remove", auth, controller.removeDeviceToken);
+
 // ====================================
 // GET NOTIFICATIONS
 // ====================================

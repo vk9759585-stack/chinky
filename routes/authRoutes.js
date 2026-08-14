@@ -38,7 +38,7 @@ router.post(
 
 router.post(
     "/forgot-password",
-    resetController.verifyOtp
+    resetController.requestReset
 );
 
 router.post(

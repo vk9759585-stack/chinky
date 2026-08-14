@@ -132,6 +132,18 @@ const userSchema = new mongoose.Schema(
             default: null
         },
 
+        lastLoginAt: {
+            type: Date,
+            default: null
+        },
+
+        // Firebase is used only for push delivery. App data remains in MongoDB.
+        fcmTokens: {
+            type: [String],
+            default: [],
+            select: false
+        },
+
         followers: [
             {
                 type: mongoose.Schema.Types.ObjectId,
@@ -166,6 +178,16 @@ const userSchema = new mongoose.Schema(
         },
 
         otpExpire: {
+            type: Date,
+            default: null
+        },
+
+        resetPasswordToken: {
+            type: String,
+            default: ""
+        },
+
+        resetPasswordExpire: {
             type: Date,
             default: null
         }

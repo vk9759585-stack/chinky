@@ -53,6 +53,7 @@
           <a href="#creators">Creators</a>
           <a href="#studio">Studio</a>
           <a href="#safety">Safety</a>
+          <a href="#download">Download</a>
         </nav>
 
         <div class="nav-actions">
@@ -66,7 +67,7 @@
             </svg>
           </button>
           <button class="button button--small button--ghost desktop-login" type="button" data-auth-open>Log in</button>
-          <a class="button button--small button--primary desktop-cta" href="#join">Join the waitlist</a>
+          <a class="button button--small button--primary desktop-cta" href="/download" data-download-link>Download app</a>
           <button class="menu-button" type="button" aria-expanded="false" aria-controls="mobile-menu" data-menu-toggle>
             <span></span><span></span><span></span>
             <span class="sr-only">Open menu</span>
@@ -80,8 +81,10 @@
         <a href="#creators">Creators</a>
         <a href="#studio">Studio</a>
         <a href="#safety">Safety</a>
+        <a href="#download">Download</a>
         <button class="button button--ghost" type="button" data-auth-open>Log in</button>
-        <a class="button button--primary" href="#join">Join the waitlist</a>
+        <a class="button button--primary" href="/download" data-download-link>Download app</a>
+        <a class="button button--ghost" href="#join">Join the waitlist</a>
       </nav>
     </header>
 
@@ -98,10 +101,11 @@
               CHINKY brings photos, short videos, stories, chats, and calls into one vibrant place made for real connection.
             </p>
             <div class="hero-actions">
-              <a class="button button--primary" href="#demo">
-                Explore the experience
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+              <a class="button button--primary" href="/download" data-download-link>
+                Download CHINKY
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"></path></svg>
               </a>
+              <a class="button button--ghost" href="#demo">Explore the experience</a>
               <button class="button button--ghost" type="button" data-preview-button>
                 <span class="play-icon">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 8 5-8 5Z"></path></svg>
@@ -364,6 +368,28 @@
         </div>
       </section>
 
+      <section class="section download-section" id="download">
+        <div class="container download-card" data-reveal>
+          <div class="download-copy">
+            <span class="section-kicker">CHINKY for Android</span>
+            <h2>Take your people with you.</h2>
+            <p>Download CHINKY and create Posts, Sparks and Vibes, chat with friends, and go live from your phone.</p>
+            <div class="download-actions">
+              <a class="button button--primary download-main" href="/download" data-download-link>
+                <span class="download-icon" aria-hidden="true">↓</span>
+                <span><small>DOWNLOAD</small><strong>CHINKY for Android</strong></span>
+              </a>
+              <a class="button button--ghost" href="mailto:appchinky@gmail.com?subject=CHINKY%20iOS%20availability">iPhone updates</a>
+            </div>
+            <small class="download-note">Download link can point to Google Play or your APK without changing the website.</small>
+          </div>
+          <div class="download-visual" aria-hidden="true">
+            <div class="download-logo-wrap"><img src="assets/chinky-logo.png" alt="" width="132" height="132" /></div>
+            <div class="download-platform"><span>Android</span><strong>CHINKY</strong><small>Create · Share · Connect</small></div>
+          </div>
+        </div>
+      </section>
+
       <section class="section join-section" id="join">
         <div class="container join-card" data-reveal>
           <div class="join-orb join-orb--one" aria-hidden="true"></div>
@@ -388,7 +414,7 @@
           <p>Create. Share. Connect.</p>
         </div>
         <div class="footer-links">
-          <div><strong>Explore</strong><a href="#experience">Experience</a><a href="#demo">Demo</a><a href="#creators">Creators</a></div>
+          <div><strong>Explore</strong><a href="#experience">Experience</a><a href="#demo">Demo</a><a href="#creators">Creators</a><a href="/download" data-download-link>Download app</a></div>
           <div><strong>Support</strong><a href="mailto:appchinky@gmail.com">Contact us</a><a href="#safety">Safety</a><a href="/delete-account">Delete account</a></div>
           <div><strong>Legal</strong><a href="/privacy-policy" data-legal="privacy">Privacy</a><a href="/terms-of-service" data-legal="terms">Terms</a><a href="/audio-policy" data-legal="audio">Audio policy</a><a href="/child-safety">Child safety</a></div>
         </div>

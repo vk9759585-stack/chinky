@@ -1,25 +1,52 @@
-const admin = require("firebase-admin");
+const {
+  applicationDefault,
+  cert,
+  getApps,
+  initializeApp,
+} = require("firebase-admin/app");
 
-// Firebase Admin is optional for core API startup. When push notifications are
-// used, credentials can come from GOOGLE_APPLICATION_CREDENTIALS / ADC or from
-// FIREBASE_SERVICE_ACCOUNT_JSON (a JSON string kept only on the server).
-if (!admin.apps.length) {
-  const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-
-  if (rawServiceAccount) {
-    try {
-      const serviceAccount = JSON.parse(rawServiceAccount);
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
-    } catch (error) {
-      throw new Error(`Invalid FIREBASE_SERVICE_ACCOUNT_JSON: ${error.message}`);
-    }
-  } else {
-    admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
-    });
-  }
+function normalizedPrivateKey(value) {
+  return String(value || "").replace(/\\n/g, "\n");
 }
 
-module.exports = admin;
+function serviceAccountFromEnv() {
+  const raw = String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim();
+  if (raw) {
+    try {
+      return JSON.parse(raw);
+    } catch (error) {
+      console.error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON:", error.message);
+      return null;
+    }
+  }
+
+  const projectId = String(process.env.FIREBASE_PROJECT_ID || "").trim();
+  const clientEmail = String(process.env.FIREBASE_CLIENT_EMAIL || "").trim();
+  const privateKey = normalizedPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+  if (projectId && clientEmail && privateKey) {
+    return {
+      project_id: projectId,
+      client_email: clientEmail,
+      private_key: privateKey,
+    };
+  }
+  return null;
+}
+
+function getFirebaseApp() {
+  const existing = getApps();
+  if (existing.length) return existing[0];
+
+  const serviceAccount = serviceAccountFromEnv();
+  if (serviceAccount) {
+    return initializeApp({ credential: cert(serviceAccount) });
+  }
+
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    return initializeApp({ credential: applicationDefault() });
+  }
+
+  return null;
+}
+
+module.exports = { getFirebaseApp };
