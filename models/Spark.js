@@ -134,6 +134,10 @@ const reelSchema = new mongoose.Schema(
             }
         ],
 
+        remixOf: { type: mongoose.Schema.Types.ObjectId, ref: 'Spark', default: null },
+
+        remixType: { type: String, enum: ['none', 'duet', 'remix'], default: 'none' },
+
         isTrending: {
             type: Boolean,
             default: false

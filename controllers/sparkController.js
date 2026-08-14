@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Spark = require("../models/Spark");
 const Report = require("../models/Report");
 const cloudinary = require("../config/cloudinary");
@@ -161,7 +162,9 @@ exports.createSpark = async (req, res) => {
             hashtags: listFromBody(req.body.hashtags),
             location: req.body.location || "",
             taggedUsers: listFromBody(req.body.taggedUsers),
-            products: listFromBody(req.body.products)
+            products: listFromBody(req.body.products),
+            remixOf: mongoose.Types.ObjectId.isValid(String(req.body.remixOf || '')) ? req.body.remixOf : null,
+            remixType: ['duet','remix'].includes(String(req.body.remixType || '')) ? req.body.remixType : 'none'
         });
 
         if (req.body.audioId) {

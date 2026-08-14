@@ -1,0 +1,1 @@
+const r=require("express").Router(),a=require("../middleware/authMiddleware"),c=require("../controllers/socialFeaturesController");r.get("/profile-qr",a,c.profileQr);r.get("/local-trending",a,c.localTrending);r.post("/:type",a,c.create);r.get("/:type",a,c.list);r.delete("/item/:id",a,c.remove);module.exports=r;

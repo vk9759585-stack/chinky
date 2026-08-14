@@ -1,0 +1,16 @@
+const router = require("express").Router();
+const auth = require("../middleware/authMiddleware");
+const c = require("../controllers/creatorFeaturesController");
+router.get("/analytics", auth, c.analytics);
+router.post("/live/schedule", auth, c.scheduleLive);
+router.get("/live/schedule", auth, c.listScheduled);
+router.post("/live/guest", auth, c.inviteGuest);
+router.post("/live/battle", auth, c.startBattle);
+router.put("/live/battle/:id", auth, c.battleAction);
+router.get("/spark/:id/remix", auth, c.remixInfo);
+router.get("/safety", auth, c.getSafety);
+router.put("/safety", auth, c.saveSafety);
+router.get("/drafts", auth, c.listDrafts);
+router.post("/drafts", auth, c.saveDraft);
+router.delete("/drafts/:id", auth, c.deleteDraft);
+module.exports = router;

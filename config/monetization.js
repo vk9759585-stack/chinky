@@ -10,27 +10,27 @@ const WITHDRAW_DIAMONDS_PER_10_RUPEES = 17; // 17 earned Diamonds = ₹10; keeps
 const PURCHASE_COINS_PER_RUPEE = PURCHASE_COINS_PER_10_RUPEES / 10;
 const WITHDRAW_COINS_PER_RUPEE = WITHDRAW_DIAMONDS_PER_10_RUPEES / 10;
 const PURCHASE_TO_WITHDRAW_MARGIN_PERCENT = 0;
-const MINIMUM_PURCHASE_PAISE = 2000; // minimum purchase ₹20
-const MINIMUM_WITHDRAWAL_COINS = 34; // 34 Diamonds = ₹20 minimum
+const MINIMUM_PURCHASE_PAISE = 3900; // minimum purchase ₹39
+const MINIMUM_WITHDRAWAL_COINS = 850; // 850 Diamonds = ₹500 minimum
 const DAILY_CHECKIN_REWARDS = Object.freeze([1, 2, 3, 4, 5, 7, 10]);
 
-const CUSTOM_COIN_MIN = 30;
+const CUSTOM_COIN_MIN = 66;
 const CUSTOM_COIN_MAX = 2500000;
 const CUSTOM_COIN_RATE_PAISE = 123; // ₹1.23 per coin for custom recharge.
 
 const GIFT_CATALOG = Object.freeze([
-  { name: 'Spark', icon: '✨', coins: 5 },
-  { name: 'Heart', icon: '❤️', coins: 10 },
-  { name: 'Flower', icon: '🌸', coins: 20 },
-  { name: 'Star', icon: '⭐', coins: 35 },
-  { name: 'Rose', icon: '🌹', coins: 50 },
-  { name: 'Crown', icon: '👑', coins: 75 },
-  { name: 'Kiss', icon: '💋', coins: 100 },
-  { name: 'Love', icon: '💖', coins: 150 },
-  { name: 'Diamond', icon: '💎', coins: 250 },
-  { name: 'Celebration', icon: '🎉', coins: 500 },
-  { name: 'Royal', icon: '🏆', coins: 1000 },
-  { name: 'Galaxy', icon: '🌌', coins: 2500 },
+  { name: 'Spark', icon: '✨', coins: 5, effectKey: 'sparkle' },
+  { name: 'Heart', icon: '❤️', coins: 10, effectKey: 'heart_pop' },
+  { name: 'Flower', icon: '🌸', coins: 20, effectKey: 'petals' },
+  { name: 'Star', icon: '⭐', coins: 35, effectKey: 'star_burst' },
+  { name: 'Rose', icon: '🌹', coins: 50, effectKey: 'rose' },
+  { name: 'Crown', icon: '👑', coins: 75, effectKey: 'crown' },
+  { name: 'Kiss', icon: '💋', coins: 100, effectKey: 'kiss' },
+  { name: 'Love', icon: '💖', coins: 150, effectKey: 'love_rain' },
+  { name: 'Diamond', icon: '💎', coins: 250, effectKey: 'diamond_burst' },
+  { name: 'Celebration', icon: '🎉', coins: 500, effectKey: 'confetti' },
+  { name: 'Royal', icon: '🏆', coins: 1000, effectKey: 'fullscreen_royal' },
+  { name: 'Galaxy', icon: '🌌', coins: 2500, effectKey: 'fullscreen_galaxy' },
 ]);
 const getGift = (name) => GIFT_CATALOG.find((item) => item.name === name);
 
@@ -46,20 +46,12 @@ const fixedPackage = (id, coins, rupees) => Object.freeze({
 });
 
 const COIN_PACKAGES = Object.freeze([
-  fixedPackage('coins_34', 34, 20),
-  fixedPackage('coins_83', 83, 49),
-  fixedPackage('coins_168', 168, 99),
-  fixedPackage('coins_338', 338, 199),
-  Object.freeze({
-    id: 'coins_933',
-    amountPaise: 49900,
-    baseCoins: 848,
-    bonusCoins: 85,
-    discountPercent: 10,
-    coins: 933,
-    androidProductId: 'chinky_coins_933',
-    iosProductId: 'chinky_coins_933',
-  }),
+  fixedPackage('coins_66', 66, 39),
+  fixedPackage('coins_134', 134, 79),
+  fixedPackage('coins_253', 253, 149),
+  fixedPackage('coins_508', 508, 299),
+  fixedPackage('coins_848', 848, 499),
+  fixedPackage('coins_1698', 1698, 999),
 ]);
 
 const getCoinPackage = (id) => COIN_PACKAGES.find((item) => item.id === id);

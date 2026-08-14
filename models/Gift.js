@@ -28,6 +28,8 @@ const giftSchema = new mongoose.Schema(
 
         platformShareCoins: { type: Number, default: 0, min: 0 },
 
+        effectKey: { type: String, default: 'pop', trim: true, maxlength: 40 },
+
         giftImage: {
             type: String,
             default: ""

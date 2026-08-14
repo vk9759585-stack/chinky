@@ -39,15 +39,10 @@ exports.startCall = async (req, res) => {
 
 exports.acceptCall = async (req, res) => {
     try {
-        const call = await Call.findByIdAndUpdate(
-            req.params.id,
-            {
-                status: "accepted",
-                startedAt: new Date()
-            },
-            {
-                new: true
-            }
+        const call = await Call.findOneAndUpdate(
+            { _id: req.params.id, receiver: req.user.id, status: "calling" },
+            { status: "accepted", startedAt: new Date() },
+            { new: true }
         );
 
         if (!call) {
@@ -78,14 +73,10 @@ exports.acceptCall = async (req, res) => {
 
 exports.rejectCall = async (req, res) => {
     try {
-        const call = await Call.findByIdAndUpdate(
-            req.params.id,
-            {
-                status: "rejected"
-            },
-            {
-                new: true
-            }
+        const call = await Call.findOneAndUpdate(
+            { _id: req.params.id, receiver: req.user.id, status: "calling" },
+            { status: "rejected", endedAt: new Date() },
+            { new: true }
         );
 
         const io = req.app.get("io");
@@ -109,7 +100,10 @@ exports.rejectCall = async (req, res) => {
 
 exports.endCall = async (req, res) => {
     try {
-        const call = await Call.findById(req.params.id);
+        const call = await Call.findOne({
+            _id: req.params.id,
+            $or: [{ caller: req.user.id }, { receiver: req.user.id }]
+        });
 
         if (!call) {
             return res.status(404).json({
@@ -165,7 +159,11 @@ exports.getCallHistory = async (req, res) => {
 
         return res.json({
             success: true,
-            data: calls
+            data: calls.map((call) => ({
+                ...call.toObject(),
+                isCaller: String(call.caller?._id || call.caller) === String(req.user.id),
+                otherUser: String(call.caller?._id || call.caller) === String(req.user.id) ? call.receiver : call.caller
+            }))
         });
     } catch (err) {
         return res.status(500).json({

@@ -7,6 +7,8 @@ const liveSessionSchema = new mongoose.Schema({
   startedAt: { type: Date, default: Date.now },
   endedAt: { type: Date, default: null },
   isLive: { type: Boolean, default: true, index: true },
+  guestUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  guestStatus: { type: String, enum: ['none', 'invited', 'accepted', 'rejected'], default: 'none' },
 }, { timestamps: true });
 
 liveSessionSchema.index({ hostUserId: 1, isLive: 1, startedAt: -1 });

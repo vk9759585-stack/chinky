@@ -149,6 +149,7 @@ exports.sendGift = async (req, res) => {
         sourceId: sessionDoc.liveID,
         creatorShareCoins: creatorCoins,
         platformShareCoins: platformCoins,
+        effectKey: selectedGift.coins >= 1000 ? 'fullscreen' : selectedGift.coins >= 250 ? 'burst' : 'pop',
       }], { session: dbSession });
       const gift = created[0];
       const senderWallet = await changeCoins({
@@ -171,7 +172,14 @@ exports.sendGift = async (req, res) => {
       });
       return { senderWallet, gift };
     });
-    return res.json({ success: true, coins: result.senderWallet.coins, gift: { id: result.gift._id, name: result.gift.giftName, coins: result.gift.coins } });
+    const activeBattle = await LiveBattle.findOne({ liveID: sessionDoc.liveID, status: "active" });
+    if (activeBattle) {
+      if (String(activeBattle.host) === String(sessionDoc.hostUserId)) activeBattle.hostScore += selectedGift.coins;
+      else if (String(activeBattle.opponent) === String(sessionDoc.hostUserId)) activeBattle.opponentScore += selectedGift.coins;
+      await activeBattle.save();
+      req.app.get("io")?.to(`live:${sessionDoc.liveID}`).emit("live:battle-score", activeBattle.toObject());
+    }
+    return res.json({ success: true, coins: result.senderWallet.coins, gift: { id: result.gift._id, name: result.gift.giftName, coins: result.gift.coins, effectKey: result.gift.effectKey } });
   } catch (error) {
     const status = String(error.message || '').includes('Insufficient') ? 400 : 500;
     return res.status(status).json({ success: false, message: error.message });
