@@ -217,6 +217,9 @@ exports.updateWithdrawalStatus = async (req, res) => {
       await row.save({ session });
       if (status === 'rejected') {
         await creditCreatorEarnings({ user: row.user, coins: row.coins, transactionType: 'withdrawal_refund', referenceType: 'withdrawal', referenceId: row._id, metadata: { reason: row.note }, session });
+      } else if (status === 'paid') {
+        const Wallet = require('../models/Wallet');
+        await Wallet.updateOne({ user: row.user }, { $inc: { totalWithdrawnPaise: row.amountPaise } }, { session });
       }
       return row;
     });
@@ -260,22 +263,47 @@ exports.getWithdrawalRequests = async (req,res)=>{
 };
 exports.reviewWithdrawalRequest = async (req,res)=>{
   try{
-    const mongoose=require('mongoose');
-    const Wallet=require('../models/Wallet');
-    const WalletLedger=require('../models/WalletLedger');
     const WithdrawalRequest=require('../models/WithdrawalRequest');
+    const Wallet=require('../models/Wallet');
+    const {creditCreatorEarnings,runFinancialTransaction}=require('../services/walletAccountingService');
     const decision=String(req.body.decision||'').toLowerCase();
     if(!['approved','rejected'].includes(decision))return res.status(400).json({success:false,message:'Decision must be approved or rejected.'});
-    const session=await mongoose.startSession();let out;
-    try{await session.withTransaction(async()=>{
-      const row=await WithdrawalRequest.findById(req.params.id).session(session);if(!row)throw new Error('Request not found');if(row.status!=='pending'){out=row;return;}
-      if(decision==='approved'){
-        const wallet=await Wallet.findOne({user:row.user}).session(session);if(!wallet||(wallet.earnedCoins||0)<row.coins)throw new Error('Insufficient earned coin balance');
-        wallet.earnedCoins-=row.coins;wallet.totalWithdrawnPaise=(wallet.totalWithdrawnPaise||0)+row.amountPaise;await wallet.save({session});
-        await WalletLedger.create([{user:row.user,transactionType:'withdrawal',coinDelta:0,earningDeltaPaise:-row.amountPaise,balanceBefore:wallet.coins,balanceAfter:wallet.coins,referenceType:'withdrawal',referenceId:String(row._id),metadata:{coins:row.coins,amountPaise:row.amountPaise,upiId:row.upiId}}],{session});
+
+    const out=await runFinancialTransaction(async(session)=>{
+      const row=await WithdrawalRequest.findById(req.params.id).session(session);
+      if(!row)throw new Error('Request not found');
+      if(row.status!=='pending')return row;
+
+      // IMPORTANT: earned diamonds were already reserved/debited when the
+      // withdrawal request was created. Never debit them a second time here.
+      if(decision==='rejected'){
+        await creditCreatorEarnings({
+          user:row.user,
+          coins:row.coins,
+          transactionType:'withdrawal_refund',
+          referenceType:'withdrawal',
+          referenceId:row._id,
+          metadata:{amountPaise:row.amountPaise,upiId:row.upiId},
+          session,
+        });
+      }else{
+        // Approval only finalizes the already-reserved withdrawal.
+        await Wallet.updateOne(
+          {user:row.user},
+          {$inc:{totalWithdrawnPaise:row.amountPaise}},
+          {session},
+        );
       }
-      row.status=decision;row.reviewedBy=req.user.id;row.reviewedAt=new Date();await row.save({session});out=row;
-    });}finally{await session.endSession();}
-    res.json({success:true,data:out});
-  }catch(e){res.status(400).json({success:false,message:e.message});}
+
+      row.status=decision;
+      row.reviewedBy=req.user.id;
+      row.reviewedAt=new Date();
+      await row.save({session});
+      return row;
+    });
+    return res.json({success:true,data:out});
+  }catch(e){
+    return res.status(400).json({success:false,message:e.message||'Withdrawal could not be reviewed.'});
+  }
 };
+

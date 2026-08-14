@@ -83,8 +83,8 @@ paymentSchema.index({
     createdAt: -1
 });
 
-paymentSchema.index({ orderId: 1 });
-paymentSchema.index({ paymentId: 1 });
+paymentSchema.index({ orderId: 1 }, { unique: true });
+paymentSchema.index({ paymentId: 1 }, { unique: true, partialFilterExpression: { paymentId: { $type: 'string', $ne: '' } } });
 
 module.exports = mongoose.model(
     "Payment",

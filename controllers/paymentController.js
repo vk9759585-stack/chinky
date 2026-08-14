@@ -243,7 +243,7 @@ exports.createUpiCoinRequest = async (req,res)=>{
     const upiId=String(req.body.upiId||'').trim().toLowerCase();
     const coinPackage=getCoinPackage(String(req.body.packageId||''));
     if(!coinPackage) return res.status(400).json({success:false,message:'Invalid coin package.'});
-    if(!/^[\w.-]{2,}@[a-zA-Z]{2,}$/.test(upiId)) return res.status(400).json({success:false,message:'Enter a valid UPI ID.'});
+    if(!/^[a-z0-9._-]{2,}@[a-z0-9.-]{2,}$/i.test(upiId)) return res.status(400).json({success:false,message:'Enter a valid UPI ID.'});
     const UpiCoinRequest=require('../models/UpiCoinRequest');
     const row=await UpiCoinRequest.create({user:req.user.id,packageId:coinPackage.id,upiId,amountPaise:coinPackage.amountPaise,coins:coinPackage.coins});
     return res.status(201).json({success:true,data:{id:row._id,status:row.status,amountPaise:row.amountPaise,coins:row.coins}});

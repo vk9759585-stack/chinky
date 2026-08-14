@@ -1,17 +1,17 @@
 /** Server-authoritative CHINKY monetization rules. */
-const CREATOR_GIFT_SHARE_BPS = 7000;
-const PLATFORM_GIFT_SHARE_BPS = 3000;
+const CREATOR_GIFT_SHARE_BPS = 6000;
+const PLATFORM_GIFT_SHARE_BPS = 4000;
 const SPARK_GIFT_MIN_FOLLOWERS = 0;
 
 // TikTok-style purchase packs adapted for CHINKY India pricing.
 // Never trust a client-supplied amount. The backend resolves every amount.
-const PURCHASE_COINS_PER_10_RUPEES = 8; // legacy compatibility only; UI does not display this.
-const WITHDRAW_DIAMONDS_PER_10_RUPEES = 25; // 25 Diamonds = ₹10
+const PURCHASE_COINS_PER_10_RUPEES = 17; // ₹10 = 17 coins
+const WITHDRAW_DIAMONDS_PER_10_RUPEES = 17; // 17 earned Diamonds = ₹10; keeps creator cash value aligned with purchased coin value
 const PURCHASE_COINS_PER_RUPEE = PURCHASE_COINS_PER_10_RUPEES / 10;
 const WITHDRAW_COINS_PER_RUPEE = WITHDRAW_DIAMONDS_PER_10_RUPEES / 10;
 const PURCHASE_TO_WITHDRAW_MARGIN_PERCENT = 0;
-const MINIMUM_PURCHASE_PAISE = 3900; // starter pack ₹39
-const MINIMUM_WITHDRAWAL_COINS = 50; // 50 Diamonds = ₹20
+const MINIMUM_PURCHASE_PAISE = 2000; // minimum purchase ₹20
+const MINIMUM_WITHDRAWAL_COINS = 34; // 34 Diamonds = ₹20 minimum
 const DAILY_CHECKIN_REWARDS = Object.freeze([1, 2, 3, 4, 5, 7, 10]);
 
 const CUSTOM_COIN_MIN = 30;
@@ -46,11 +46,20 @@ const fixedPackage = (id, coins, rupees) => Object.freeze({
 });
 
 const COIN_PACKAGES = Object.freeze([
-  fixedPackage('coins_30', 30, 39),
-  fixedPackage('coins_350', 350, 429),
-  fixedPackage('coins_700', 700, 859),
-  fixedPackage('coins_1400', 1400, 1719),
-  fixedPackage('coins_3500', 3500, 4299),
+  fixedPackage('coins_34', 34, 20),
+  fixedPackage('coins_83', 83, 49),
+  fixedPackage('coins_168', 168, 99),
+  fixedPackage('coins_338', 338, 199),
+  Object.freeze({
+    id: 'coins_933',
+    amountPaise: 49900,
+    baseCoins: 848,
+    bonusCoins: 85,
+    discountPercent: 10,
+    coins: 933,
+    androidProductId: 'chinky_coins_933',
+    iosProductId: 'chinky_coins_933',
+  }),
 ]);
 
 const getCoinPackage = (id) => COIN_PACKAGES.find((item) => item.id === id);
