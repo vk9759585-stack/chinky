@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const reelSchema = new mongoose.Schema(
+const sparkSchema = new mongoose.Schema(
     {
         user: {
             type: mongoose.Schema.Types.ObjectId,
@@ -174,11 +174,11 @@ const reelSchema = new mongoose.Schema(
     }
 );
 
-reelSchema.index({ user: 1, createdAt: -1 });
-reelSchema.index({ taggedUsers: 1, createdAt: -1 });
-reelSchema.index({ createdAt: -1 });
+sparkSchema.index({ user: 1, createdAt: -1 });
+sparkSchema.index({ taggedUsers: 1, createdAt: -1 });
+sparkSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model(
     "Spark",
-    reelSchema
+    sparkSchema
 );

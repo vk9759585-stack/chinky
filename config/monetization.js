@@ -27,7 +27,7 @@ const withPurchaseFee = (coinPackage) => {
 };
 
 
-// TikTok-style purchase packs adapted for CHINKY India pricing.
+// CHINKY purchase packs configured for India pricing.
 // Never trust a client-supplied amount. The backend resolves every amount.
 const PURCHASE_COINS_PER_10_RUPEES = 0; // Fixed packs only; no public rupee-to-coin rate.
 const WITHDRAW_DIAMONDS_PER_10_RUPEES = 10; // 10 earned Diamonds = ₹10.

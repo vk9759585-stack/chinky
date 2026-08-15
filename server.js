@@ -162,7 +162,6 @@ app.use("/api/groups", require("./routes/groupChatRoutes"));
 // SPARK
 app.use("/api/spark", require("./routes/sparkRoutes"));
 app.use("/api/audio", require("./routes/audioRoutes"));
-app.use("/api/reels", require("./routes/sparkRoutes"));
 app.use("/api/spark-comments", require("./routes/sparkCommentRoutes"));
 
 // CREATE
@@ -279,6 +278,16 @@ const publicDocuments = Object.freeze({
     file: "audio-policy.md",
     title: "Audio Policy",
     description: "Rules for uploading, saving, and reusing audio on CHINKY.",
+  },
+  "/license": {
+    file: "app-license.md",
+    title: "CHINKY Application License",
+    description: "License terms for CHINKY proprietary application materials.",
+  },
+  "/third-party-notices": {
+    file: "license-notices.md",
+    title: "License & Third-Party Notices",
+    description: "Open-source licensing and third-party attribution information for CHINKY.",
   },
 });
 
@@ -400,8 +409,7 @@ const sharePage = ({ title, description, canonicalUrl, imageUrl = "https://chink
 <title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(description)}">
 <meta property="og:type" content="website"><meta property="og:site_name" content="CHINKY">
 <meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}">
-<meta property="og:url" content="${escapeHtml(canonicalUrl)}"><meta property="og:image" content="${escapeHtml(imageUrl)}">
-<meta name="twitter:card" content="summary_large_image"><link rel="canonical" href="${escapeHtml(canonicalUrl)}">
+<meta property="og:url" content="${escapeHtml(canonicalUrl)}"><meta property="og:image" content="${escapeHtml(imageUrl)}"><link rel="canonical" href="${escapeHtml(canonicalUrl)}">
 <meta name="theme-color" content="#000000"><link rel="stylesheet" href="/styles.css"></head>
 <body><main class="legal-page-main"><article class="legal-page-card"><a class="brand" href="/"><img src="/assets/chinky-logo.png" alt=""><span>CHINKY</span></a><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p><a class="button" href="/">Open CHINKY</a></article></main></body></html>`;
 

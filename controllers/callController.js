@@ -13,6 +13,33 @@ exports.startCall = async (req, res) => {
         if (receiverId === String(req.user.id)) {
             return res.status(400).json({ success: false, message: "You cannot call yourself" });
         }
+        // Clear abandoned calls so a previously interrupted call cannot block
+        // every future call between the same two users.
+        const staleRingingBefore = new Date(Date.now() - 90 * 1000);
+        const staleAcceptedBefore = new Date(Date.now() - 3 * 60 * 60 * 1000);
+        await Call.updateMany(
+            {
+                status: { $in: ["calling", "ringing"] },
+                createdAt: { $lt: staleRingingBefore },
+                $or: [
+                    { caller: req.user.id, receiver: receiverId },
+                    { caller: receiverId, receiver: req.user.id }
+                ]
+            },
+            { $set: { status: "missed", endedAt: new Date() } }
+        );
+        await Call.updateMany(
+            {
+                status: "accepted",
+                updatedAt: { $lt: staleAcceptedBefore },
+                $or: [
+                    { caller: req.user.id, receiver: receiverId },
+                    { caller: receiverId, receiver: req.user.id }
+                ]
+            },
+            { $set: { status: "ended", endedAt: new Date() } }
+        );
+
         const active = await Call.findOne({
             status: { $in: ["calling", "ringing", "accepted"] },
             $or: [
@@ -21,7 +48,16 @@ exports.startCall = async (req, res) => {
             ]
         });
         if (active) {
-            return res.status(409).json({ success: false, message: "A call is already active" });
+            // Reuse the caller's own still-active call. This makes Start Call
+            // idempotent after a network retry instead of showing a false error.
+            if (String(active.caller) === String(req.user.id)) {
+                return res.status(200).json({
+                    success: true,
+                    message: "Existing call resumed",
+                    data: active
+                });
+            }
+            return res.status(409).json({ success: false, message: "An incoming call is already active" });
         }
         const call = await Call.create({
             caller: req.user.id,
@@ -60,7 +96,7 @@ exports.startCall = async (req, res) => {
 exports.acceptCall = async (req, res) => {
     try {
         const call = await Call.findOneAndUpdate(
-            { _id: req.params.id, receiver: req.user.id, status: "calling" },
+            { _id: req.params.id, receiver: req.user.id, status: { $in: ["calling", "ringing"] } },
             { status: "accepted", startedAt: new Date() },
             { new: true }
         );
@@ -94,7 +130,7 @@ exports.acceptCall = async (req, res) => {
 exports.rejectCall = async (req, res) => {
     try {
         const call = await Call.findOneAndUpdate(
-            { _id: req.params.id, receiver: req.user.id, status: "calling" },
+            { _id: req.params.id, receiver: req.user.id, status: { $in: ["calling", "ringing"] } },
             { status: "rejected", endedAt: new Date() },
             { new: true }
         );
@@ -169,7 +205,7 @@ exports.getCallHistory = async (req, res) => {
     try {
         const missedBefore = new Date(Date.now() - 60 * 1000);
         await Call.updateMany(
-            { receiver: req.user.id, status: "calling", createdAt: { $lt: missedBefore } },
+            { receiver: req.user.id, status: { $in: ["calling", "ringing"] }, createdAt: { $lt: missedBefore } },
             { $set: { status: "missed", endedAt: new Date() } }
         );
         const calls = await Call.find({

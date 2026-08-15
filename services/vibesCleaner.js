@@ -9,9 +9,9 @@ cron.schedule("* * * * *", async () => {
     });
 
     if (result.deletedCount > 0) {
-      console.log(`🧹 Deleted ${result.deletedCount} expired stories`);
+      console.log(`🧹 Deleted ${result.deletedCount} expired Vibes`);
     }
   } catch (error) {
-    console.error("❌ Error deleting expired stories:", error.message);
+    console.error("❌ Error deleting expired Vibes:", error.message);
   }
 });
