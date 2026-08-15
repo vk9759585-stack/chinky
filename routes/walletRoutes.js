@@ -5,6 +5,7 @@ const checkin = require('../controllers/dailyCheckInController');
 router.get('/', auth, wallet.getWallet);
 router.get('/coin-packages', auth, wallet.getCoinPackages);
 router.get('/activity', auth, wallet.getActivity);
+router.get('/gifts/received', auth, wallet.getReceivedGifts);
 router.get('/gifts', auth, wallet.getGiftCatalog);
 router.get('/monetization', auth, wallet.getMonetizationConfig);
 router.get('/withdrawals', auth, wallet.getWithdrawalRequests);

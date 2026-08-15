@@ -5,6 +5,7 @@ const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
 const Wallet = require("../models/Wallet");
 const Gift = require("../models/Gift");
+const Notification = require("../models/Notification");
 const Audio = require("../models/Audio");
 const { createSocialNotification } = require("../services/socialNotificationService");
 const { SPARK_GIFT_MIN_FOLLOWERS, splitCoins, getGift } = require('../config/monetization');
@@ -483,6 +484,8 @@ exports.sendGift = async (req, res) => {
             });
             return { gift: gift[0], coins: senderWallet.coins };
         });
+        await Notification.create({ sender: req.user.id, receiver: spark.user._id, type: 'gift', title: 'New Spark gift', body: `${req.body.giftName} • ${cost} coins`, link: `/spark/${spark._id}` }).catch(() => null);
+        req.app.get("io")?.to(String(spark.user._id)).emit('gift:received', { sourceType: 'spark', sourceId: String(spark._id), giftName: req.body.giftName, coins: cost });
         return res.json({ success: true, coins: result.coins, gift: { id: result.gift._id, name: result.gift.giftName, coins: result.gift.coins } });
     } catch (err) { return res.status(500).json({ success: false, message: err.message }); }
 };

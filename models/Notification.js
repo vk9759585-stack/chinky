@@ -28,7 +28,8 @@ const notificationSchema = new mongoose.Schema(
                 "vibes_like",
                 "club_invite",
                 "verification",
-                "support"
+                "support",
+                "gift"
             ],
             required: true
         },

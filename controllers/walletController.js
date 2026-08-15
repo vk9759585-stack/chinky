@@ -1,6 +1,7 @@
 const Wallet = require('../models/Wallet');
 const WalletLedger = require('../models/WalletLedger');
 const WithdrawalRequest = require('../models/WithdrawalRequest');
+const Gift = require('../models/Gift');
 const { COIN_PACKAGES, GIFT_CATALOG, PURCHASE_COINS_PER_10_RUPEES, WITHDRAW_DIAMONDS_PER_10_RUPEES, MINIMUM_PURCHASE_PAISE, MINIMUM_WITHDRAWAL_COINS, withPurchaseFee, withdrawalFeePaise } = require('../config/monetization');
 const { getOrCreateWallet, debitEarnedCoins, runFinancialTransaction } = require('../services/walletAccountingService');
 
@@ -8,6 +9,42 @@ exports.getWallet = async (req, res) => { try { res.json({ success: true, data: 
 exports.addCoins = async (_, res) => res.status(405).json({ success: false, message: 'Direct coin credits are disabled.' });
 exports.removeCoins = async (req, res) => { try { const coins = Math.floor(Number(req.body.coins || 0)); const w = await Wallet.findOne({ user: req.user.id }); if (!w || coins <= 0 || w.coins < coins) return res.status(400).json({ success: false, message: 'Insufficient balance' }); w.coins -= coins; await w.save(); return res.json({ success: true, data: w }); } catch (e) { return res.status(500).json({ success: false, message: e.message }); } };
 exports.getCoinPackages = (_, res) => res.json({ success: true, data: COIN_PACKAGES.map(withPurchaseFee) });
+
+exports.getReceivedGifts = async (req, res) => {
+  try {
+    const query = { receiver: req.user.id, status: 'completed' };
+    const [rows, count, totals] = await Promise.all([
+      Gift.find(query).populate('sender', 'name username profileImage verified').sort({ createdAt: -1 }).limit(100).lean(),
+      Gift.countDocuments(query),
+      Gift.aggregate([{ $match: { receiver: new (require('mongoose').Types.ObjectId)(req.user.id), status: 'completed' } }, { $group: { _id: null, totalCoins: { $sum: '$coins' } } }]),
+    ]);
+    const totalCoins = totals[0]?.totalCoins || 0;
+    return res.json({
+      success: true,
+      data: {
+        count,
+        totalCoins,
+        gifts: rows.map(row => ({
+          id: String(row._id),
+          giftName: row.giftName,
+          coins: row.coins || 0,
+          sourceType: row.sourceType,
+          sourceId: row.sourceId,
+          createdAt: row.createdAt,
+          sender: row.sender ? {
+            id: String(row.sender._id),
+            name: row.sender.name || '',
+            username: row.sender.username || '',
+            profileImage: row.sender.profileImage || '',
+            verified: row.sender.verified === true,
+          } : null,
+        })),
+      },
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: 'Gift history could not be loaded.' });
+  }
+};
 exports.getGiftCatalog = (_, res) => res.json({ success: true, data: { purchaseCoinsPer10Rupees: 0, withdrawDiamondsPer10Rupees: WITHDRAW_DIAMONDS_PER_10_RUPEES, gifts: GIFT_CATALOG } });
 exports.getMonetizationConfig = (_, res) => res.json({ success: true, data: { purchaseCoinsPer10Rupees: 0, withdrawDiamondsPer10Rupees: WITHDRAW_DIAMONDS_PER_10_RUPEES, minimumPurchasePaise: MINIMUM_PURCHASE_PAISE, minimumWithdrawalDiamonds: MINIMUM_WITHDRAWAL_COINS, showCommissionPercentage: false } });
 exports.getActivity = async (req, res) => { try { const rows = await WalletLedger.find({ user: req.user.id }).sort({ createdAt: -1 }).limit(30).lean(); return res.json({ success: true, data: rows.map(x => ({ id: String(x._id), type: x.transactionType, coinDelta: x.coinDelta || 0, earningDeltaPaise: x.earningDeltaPaise || 0, createdAt: x.createdAt, metadata: x.metadata || {} })) }); } catch (_) { return res.status(500).json({ success: false, message: 'Wallet activity could not be loaded.' }); } };

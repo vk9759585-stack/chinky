@@ -1,4 +1,6 @@
 const Call = require("../models/Call");
+const User = require("../models/User");
+const { sendNotification } = require("../services/notificationService");
 
 // ======================================
 // START CALL
@@ -71,9 +73,37 @@ exports.startCall = async (req, res) => {
         await call.save();
 
         const io = req.app.get("io");
-        if (io) {
-            const incoming = await Call.findById(call._id).populate("caller", "name username profileImage");
+        const incoming = await Call.findById(call._id)
+            .populate("caller", "name username profileImage");
+        if (io && incoming) {
             io.to(`user:${receiverId}`).emit("call:incoming", incoming.toObject());
+        }
+
+        // Real device call alert when the receiver is backgrounded or the
+        // socket is temporarily unavailable. The RTC room itself still starts
+        // only after the receiver accepts.
+        const receiver = await User.findById(receiverId)
+            .select("fcmTokens")
+            .lean()
+            .catch(() => null);
+        const caller = incoming?.caller;
+        const callerName = String(
+            caller?.username || caller?.name || "CHINKY user"
+        );
+        const callerImage = String(caller?.profileImage || "");
+        if (receiver?.fcmTokens?.length) {
+            sendNotification(
+                receiver.fcmTokens,
+                req.body.type === "video" ? "Incoming video call" : "Incoming voice call",
+                `${callerName} is calling you`,
+                {
+                    type: "incoming_call",
+                    callId: String(call._id),
+                    callType: call.type,
+                    username: callerName,
+                    profileImage: callerImage
+                }
+            ).catch(() => {});
         }
 
         return res.status(201).json({
