@@ -24,16 +24,14 @@ const storage = multer.diskStorage({
     },
 
     filename(req, file, cb) {
+        const ext = path.extname(file.originalname || "").toLowerCase();
+        const safeBase = path
+            .basename(file.originalname || "upload", ext)
+            .replace(/[^a-zA-Z0-9_-]+/g, "-")
+            .slice(0, 48);
         const uniqueName =
-            Date.now() +
-            "-" +
-            Math.round(Math.random() * 1e9);
-
-        cb(
-            null,
-            uniqueName +
-                path.extname(file.originalname)
-        );
+            Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(null, `${safeBase || "upload"}-${uniqueName}${ext}`);
     }
 });
 
@@ -54,6 +52,12 @@ const fileFilter = (req, file, cb) => {
         "audio/mpeg",
         "audio/mp3",
         "audio/wav",
+        "audio/x-m4a",
+        "audio/mp4",
+        "audio/aac",
+        "video/webm",
+        "image/heic",
+        "image/heif",
         "application/pdf",
         "text/plain",
         "application/msword",
@@ -80,7 +84,10 @@ module.exports = multer({
     storage,
 
     limits: {
-        fileSize: 1024 * 1024 * 100
+        fileSize: 1024 * 1024 * 250,
+        files: 3,
+        fields: 40,
+        parts: 50
     },
 
     fileFilter

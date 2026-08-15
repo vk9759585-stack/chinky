@@ -71,6 +71,8 @@ const paymentSchema = new mongoose.Schema(
 
         coins: { type: Number, default: 0, min: 0 },
 
+        failureReason: { type: String, default: '' },
+
         processedAt: { type: Date, default: null }
     },
     {

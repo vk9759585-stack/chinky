@@ -157,6 +157,7 @@ app.use("/api/legal", require("./routes/legalRoutes"));
 
 // CHAT
 app.use("/api/chat", require("./routes/chatRoutes"));
+app.use("/api/groups", require("./routes/groupChatRoutes"));
 
 // SPARK
 app.use("/api/spark", require("./routes/sparkRoutes"));

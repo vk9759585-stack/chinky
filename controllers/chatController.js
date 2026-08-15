@@ -183,7 +183,7 @@ exports.getMessages = async (req, res) => {
 
         .sort({
 
-            createdAt: 1
+            createdAt: -1
 
         })
 
@@ -199,7 +199,7 @@ exports.getMessages = async (req, res) => {
 
             count: chats.length,
 
-            data: chats.map((chat) => ({
+            data: chats.reverse().map((chat) => ({
                 ...chat.toObject(),
                 isMine: chat.sender?.toString() === req.user.id.toString()
             }))
@@ -236,26 +236,10 @@ exports.markSeen = async (req, res) => {
 
     try {
 
-        const chat = await Chat.findByIdAndUpdate(
-
-            req.params.id,
-
-            {
-
-                seen: true,
-
-                delivered: true,
-
-                seenAt: new Date()
-
-            },
-
-            {
-
-                new: true
-
-            }
-
+        const chat = await Chat.findOneAndUpdate(
+            { _id: req.params.id, receiver: req.user.id },
+            { seen: true, delivered: true, seenAt: new Date() },
+            { new: true }
         );
 
         const io = req.app.get("io");
@@ -523,18 +507,16 @@ exports.pinMessage = async (req, res) => {
 
     try {
 
-        const chat = await Chat.findById(req.params.id);
+        const chat = await Chat.findOne({
+            _id: req.params.id,
+            $or: [{ sender: req.user.id }, { receiver: req.user.id }]
+        });
 
         if (!chat) {
-
             return res.status(404).json({
-
                 success: false,
-
                 message: "Message not found"
-
             });
-
         }
 
         chat.pinned = !chat.pinned;
@@ -617,7 +599,10 @@ exports.addReaction = async (req, res) => {
 
         const { emoji } = req.body;
 
-        const chat = await Chat.findById(req.params.id);
+        const chat = await Chat.findOne({
+            _id: req.params.id,
+            $or: [{ sender: req.user.id }, { receiver: req.user.id }]
+        });
 
         if (!chat) {
 

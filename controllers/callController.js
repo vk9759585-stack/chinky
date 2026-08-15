@@ -6,18 +6,38 @@ const Call = require("../models/Call");
 
 exports.startCall = async (req, res) => {
     try {
+        const receiverId = String(req.body.receiverId || "");
+        if (!receiverId) {
+            return res.status(400).json({ success: false, message: "Receiver is required" });
+        }
+        if (receiverId === String(req.user.id)) {
+            return res.status(400).json({ success: false, message: "You cannot call yourself" });
+        }
+        const active = await Call.findOne({
+            status: { $in: ["calling", "ringing", "accepted"] },
+            $or: [
+                { caller: req.user.id, receiver: receiverId },
+                { caller: receiverId, receiver: req.user.id }
+            ]
+        });
+        if (active) {
+            return res.status(409).json({ success: false, message: "A call is already active" });
+        }
         const call = await Call.create({
             caller: req.user.id,
-            receiver: req.body.receiverId,
-            type: req.body.type || "voice",
+            receiver: receiverId,
+            type: req.body.type === "video" ? "video" : "voice",
             status: "calling",
             createdAt: new Date()
         });
 
+        call.status = "ringing";
+        await call.save();
+
         const io = req.app.get("io");
         if (io) {
             const incoming = await Call.findById(call._id).populate("caller", "name username profileImage");
-            io.to(`user:${req.body.receiverId}`).emit("call:incoming", incoming.toObject());
+            io.to(`user:${receiverId}`).emit("call:incoming", incoming.toObject());
         }
 
         return res.status(201).json({
@@ -147,6 +167,11 @@ exports.endCall = async (req, res) => {
 
 exports.getCallHistory = async (req, res) => {
     try {
+        const missedBefore = new Date(Date.now() - 60 * 1000);
+        await Call.updateMany(
+            { receiver: req.user.id, status: "calling", createdAt: { $lt: missedBefore } },
+            { $set: { status: "missed", endedAt: new Date() } }
+        );
         const calls = await Call.find({
             $or: [
                 { caller: req.user.id },

@@ -1,0 +1,2 @@
+const r=require("express").Router();const auth=require("../middleware/authMiddleware");const c=require("../controllers/groupChatController");
+r.post("/",auth,c.create);r.get("/",auth,c.list);r.get("/:id/messages",auth,c.messages);r.post("/:id/messages",auth,c.send);module.exports=r;

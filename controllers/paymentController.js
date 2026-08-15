@@ -145,6 +145,49 @@ exports.verifyCoinPayment = async (req, res) => {
 
 
 
+
+exports.getMyCoinPayments = async (req, res) => {
+    const rows = await Payment.find({ user: req.user.id, purpose: 'coins' })
+        .sort({ createdAt: -1 }).limit(30).lean();
+    return res.json({ success: true, data: rows.map((row) => ({
+        id: String(row._id), orderId: row.orderId, paymentId: row.paymentId || '',
+        packageId: row.packageId || '', coins: row.coins || 0, amountPaise: row.amount,
+        currency: row.currency, status: row.status, failureReason: row.failureReason || '',
+        processedAt: row.processedAt, createdAt: row.createdAt,
+    })) });
+};
+
+exports.recoverCoinPayment = async (req, res) => {
+    if (!razorpay) return paymentUnavailable(res);
+    const orderId = String(req.body.orderId || '').trim();
+    if (!orderId) return res.status(400).json({ success: false, message: 'Order id is required.' });
+    try {
+        const record = await Payment.findOne({ user: req.user.id, orderId, purpose: 'coins' });
+        if (!record) return res.status(404).json({ success: false, message: 'Payment order not found.' });
+        if (record.status === 'paid') return res.json({ success: true, alreadyProcessed: true, data: await getOrCreateWallet(req.user.id) });
+        const result = await razorpay.orders.fetchPayments(orderId);
+        const items = Array.isArray(result?.items) ? result.items : [];
+        const gatewayPayment = items.find((x) => x && x.order_id === orderId && ['captured','authorized'].includes(x.status));
+        if (!gatewayPayment) return res.status(409).json({ success: false, pending: true, message: 'No completed payment was found for this order yet.' });
+        if (Number(gatewayPayment.amount) !== Number(record.amount) || gatewayPayment.currency !== 'INR') {
+            return res.status(400).json({ success: false, message: 'Gateway amount mismatch.' });
+        }
+        let paid = gatewayPayment;
+        if (paid.status === 'authorized') paid = await razorpay.payments.capture(paid.id, record.amount, 'INR');
+        if (paid.status !== 'captured') return res.status(409).json({ success: false, pending: true, message: 'Payment is not captured yet.' });
+        const wallet = await runFinancialTransaction(async (session) => {
+            const payment = await Payment.findOne({ user: req.user.id, orderId }).session(session);
+            if (payment.status === 'paid') return getOrCreateWallet(req.user.id, session);
+            const duplicate = await Payment.findOne({ paymentId: paid.id, status: 'paid' }).session(session);
+            if (duplicate) throw new Error('Payment has already been processed');
+            payment.paymentId = paid.id; payment.status = 'paid'; payment.processedAt = new Date();
+            await payment.save({ session });
+            return changeCoins({ user:req.user.id, delta:payment.coins, transactionType:'coin_purchase', referenceType:'payment', referenceId:payment._id, metadata:{orderId,paymentId:paid.id,packageId:payment.packageId,amountPaise:payment.amount,recovered:true}, session });
+        });
+        return res.json({ success: true, recovered: true, data: wallet });
+    } catch (err) { return res.status(400).json({ success:false, message:err.message || 'Payment recovery failed.' }); }
+};
+
 // ======================================
 // GOOGLE PLAY / APP STORE COIN PURCHASE
 // ======================================
@@ -248,9 +291,12 @@ exports.createUpiCoinRequest = async (req,res)=>{
     if(!coinPackage) return res.status(400).json({success:false,message:'Invalid coin package.'});
     if(!/^[a-z0-9._-]{2,}@[a-z0-9.-]{2,}$/i.test(upiId)) return res.status(400).json({success:false,message:'Enter a valid UPI ID.'});
     const UpiCoinRequest=require('../models/UpiCoinRequest');
-    const pricedPackage=withPurchaseFee(coinPackage); const row=await UpiCoinRequest.create({user:req.user.id,packageId:pricedPackage.id,upiId,baseAmountPaise:pricedPackage.baseAmountPaise,serviceFeePaise:pricedPackage.serviceFeePaise,amountPaise:pricedPackage.totalAmountPaise,coins:pricedPackage.coins});
-    return res.status(201).json({success:true,data:{id:row._id,status:row.status,baseAmountPaise:row.baseAmountPaise,serviceFeePaise:row.serviceFeePaise,amountPaise:row.amountPaise,coins:row.coins}});
-  }catch(e){ return res.status(500).json({success:false,message:'UPI request could not be created.'}); }
+    const existing=await UpiCoinRequest.findOne({user:req.user.id,status:'pending'});
+    if(existing) return res.status(409).json({success:false,message:'Your previous UPI purchase request is still pending.'});
+    const pricedPackage=withPurchaseFee(coinPackage);
+    const row=await UpiCoinRequest.create({user:req.user.id,packageId:pricedPackage.id,upiId,baseAmountPaise:pricedPackage.baseAmountPaise,serviceFeePaise:pricedPackage.serviceFeePaise,amountPaise:pricedPackage.totalAmountPaise,coins:pricedPackage.coins});
+    return res.status(201).json({success:true,message:'UPI purchase request created.',data:{id:row._id,status:row.status,baseAmountPaise:row.baseAmountPaise,serviceFeePaise:row.serviceFeePaise,amountPaise:row.amountPaise,coins:row.coins}});
+  }catch(e){ console.error('UPI request error:',e); return res.status(500).json({success:false,message:'UPI request could not be created on the server.'}); }
 };
 exports.getMyUpiCoinRequests = async (req,res)=>{
   const UpiCoinRequest=require('../models/UpiCoinRequest');
