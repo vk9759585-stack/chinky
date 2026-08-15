@@ -16,6 +16,29 @@ const UpiCoinRequest = require("../models/UpiCoinRequest");
 const SparkComment = require("../models/SparkComment");
 const LiveSession = require("../models/LiveSession");
 const ShopOrder = require("../models/ShopOrder");
+const Audio = require("../models/Audio");
+const Call = require("../models/Call");
+const Conversation = require("../models/Conversation");
+const CreatorToolsProfile = require("../models/CreatorToolsProfile");
+const DailyCheckIn = require("../models/DailyCheckIn");
+const FamilyPairing = require("../models/FamilyPairing");
+const Feedback = require("../models/Feedback");
+const Follow = require("../models/Follow");
+const Gift = require("../models/Gift");
+const GroupChat = require("../models/GroupChat");
+const GroupMessage = require("../models/GroupMessage");
+const LiveBattle = require("../models/LiveBattle");
+const LoginHistory = require("../models/LoginHistory");
+const Message = require("../models/Message");
+const Otp = require("../models/Otp");
+const Referral = require("../models/Referral");
+const Report = require("../models/Report");
+const Revenue = require("../models/Revenue");
+const ScheduledLive = require("../models/ScheduledLive");
+const SocialFeature = require("../models/SocialFeature");
+const StorePurchase = require("../models/StorePurchase");
+const SupportTicket = require("../models/SupportTicket");
+const VibesSeen = require("../models/VibesSeen");
 
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
@@ -316,6 +339,13 @@ exports.requestVerification = async (req, res) => {
             });
         }
 
+        if (user.verified || user.verificationStatus === "verified") {
+            return res.status(409).json({ success: false, message: "Account is already verified" });
+        }
+        if (user.verificationStatus === "pending") {
+            return res.json({ success: true, message: "Verification request is already pending" });
+        }
+
         user.verificationStatus = "pending";
 
         await user.save();
@@ -342,6 +372,13 @@ exports.deleteAccount = async (req, res) => {
     try {
         const userId = req.user.id;
 
+        const [postIds, sparkIds, vibeIds, ownedGroupIds] = await Promise.all([
+            Post.find({ user: userId }).distinct("_id"),
+            Spark.find({ user: userId }).distinct("_id"),
+            Vibes.find({ user: userId }).distinct("_id"),
+            GroupChat.find({ owner: userId }).distinct("_id")
+        ]);
+
         await Promise.all([
             Post.deleteMany({ user: userId }),
             Spark.deleteMany({ user: userId }),
@@ -352,8 +389,12 @@ exports.deleteAccount = async (req, res) => {
                     { receiver: userId }
                 ]
             }),
-            Comment.deleteMany({ user: userId }),
-            VibesComment.deleteMany({ user: userId }),
+            Comment.deleteMany({ $or: [{ user: userId }, { post: { $in: postIds } }] }),
+            SparkComment.deleteMany({ $or: [{ user: userId }, { reel: { $in: sparkIds } }] }),
+            VibesComment.deleteMany({ $or: [{ user: userId }, { vibe: { $in: vibeIds } }] }),
+            Post.updateMany({}, { $pull: { likes: userId, saves: userId, taggedUsers: userId } }),
+            Spark.updateMany({}, { $pull: { likes: userId, saves: userId, taggedUsers: userId } }),
+            Vibes.updateMany({}, { $pull: { likes: userId, viewers: userId, taggedUsers: userId } }),
             User.updateMany(
                 { _id: { $ne: userId } },
                 { $pull: { followers: userId, following: userId, blockedUsers: userId } }
@@ -365,7 +406,39 @@ exports.deleteAccount = async (req, res) => {
                 ]
             }),
             Subscription.deleteMany({ user: userId }),
-            DataExportRequest.deleteMany({ user: userId })
+            DataExportRequest.deleteMany({ user: userId }),
+            Wallet.deleteMany({ user: userId }),
+            WalletLedger.deleteMany({ user: userId }),
+            Payment.deleteMany({ user: userId }),
+            WithdrawalRequest.deleteMany({ user: userId }),
+            UpiCoinRequest.deleteMany({ user: userId }),
+            ShopOrder.deleteMany({ user: userId }),
+            StorePurchase.deleteMany({ user: userId }),
+            Call.deleteMany({ $or: [{ caller: userId }, { receiver: userId }] }),
+            Conversation.deleteMany({ members: userId }),
+            Message.deleteMany({ $or: [{ sender: userId }, { receiver: userId }] }),
+            Follow.deleteMany({ $or: [{ follower: userId }, { following: userId }] }),
+            Gift.deleteMany({ $or: [{ sender: userId }, { receiver: userId }] }),
+            FamilyPairing.deleteMany({ $or: [{ parent: userId }, { teen: userId }] }),
+            LiveSession.deleteMany({ $or: [{ hostUserId: userId }, { guestUserId: userId }] }),
+            LiveBattle.deleteMany({ $or: [{ host: userId }, { opponent: userId }] }),
+            ScheduledLive.deleteMany({ host: userId }),
+            LoginHistory.deleteMany({ user: userId }),
+            Otp.deleteMany({ user: userId }),
+            Referral.deleteMany({ $or: [{ referrer: userId }, { referredUser: userId }] }),
+            Report.deleteMany({ $or: [{ reporter: userId }, { targetUser: userId }] }),
+            Revenue.deleteMany({ user: userId }),
+            SocialFeature.deleteMany({ $or: [{ owner: userId }, { targetUser: userId }] }),
+            SupportTicket.deleteMany({ user: userId }),
+            Feedback.deleteMany({ user: userId }),
+            DailyCheckIn.deleteMany({ user: userId }),
+            CreatorToolsProfile.deleteMany({ user: userId }),
+            VibesSeen.deleteMany({ user: userId }),
+            GroupMessage.deleteMany({ $or: [{ sender: userId }, { group: { $in: ownedGroupIds } }] }),
+            GroupChat.deleteMany({ _id: { $in: ownedGroupIds } }),
+            GroupChat.updateMany({}, { $pull: { members: userId, admins: userId } }),
+            Audio.updateMany({}, { $pull: { savedBy: userId } }),
+            Audio.updateMany({ owner: userId }, { $set: { owner: null } })
         ]);
 
         await User.findByIdAndDelete(userId);
@@ -474,13 +547,18 @@ exports.updateAppSettings = async (req, res) => {
         const entries = Object.entries(changes);
         if (entries.length > 50) return res.status(400).json({ success: false, message: "Too many settings" });
         const set = {};
+        const unset = {};
         for (const [key, value] of entries) {
             if (!SAFE_SETTING_KEY.test(key)) return res.status(400).json({ success: false, message: `Invalid setting key: ${key}` });
             const valid = value === null || ["boolean","string","number"].includes(typeof value) || (Array.isArray(value) && value.length <= 100);
             if (!valid) return res.status(400).json({ success: false, message: `Invalid value for ${key}` });
-            set[`appSettings.${key}`] = value;
+            if (value === null) unset[`appSettings.${key}`] = 1;
+            else set[`appSettings.${key}`] = value;
         }
-        const user = await User.findByIdAndUpdate(req.user.id, { $set: set }, { new: true, runValidators: true }).select("appSettings").lean();
+        const update = {};
+        if (Object.keys(set).length) update.$set = set;
+        if (Object.keys(unset).length) update.$unset = unset;
+        const user = await User.findByIdAndUpdate(req.user.id, update, { new: true, runValidators: true }).select("appSettings").lean();
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
         return res.json({ success: true, data: user.appSettings || {} });
     } catch (_) {
@@ -536,6 +614,12 @@ exports.requestBusinessVerification = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        if (user.businessVerificationStatus === "verified") {
+            return res.status(409).json({ success: false, message: "Business is already verified" });
+        }
+        if (user.businessVerificationStatus === "pending") {
+            return res.json({ success: true, message: "Business verification request is already pending" });
+        }
         user.accountType = "professional";
         user.businessVerificationStatus = "pending";
         await user.save();
@@ -574,7 +658,9 @@ async function buildExportPayload(userId, categories) {
     const wants = new Set(categories);
 
     if (wants.has("Profile and Settings")) {
-        const user = await User.findById(userId).select("-password -otp -otpExpire").lean();
+        const user = await User.findById(userId)
+            .select("-password -otp -otpExpire -resetPasswordToken -resetPasswordExpire")
+            .lean();
         payload.categories["Profile and Settings"] = scrub(user || {});
     }
 

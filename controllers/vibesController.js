@@ -1,5 +1,6 @@
 const Vibes = require("../models/Vibes");
 const VibesComment = require("../models/VibesComment");
+const { canInteract, isCommentFiltered } = require("../services/privacyGuardService");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
 const Audio = require("../models/Audio");
@@ -333,8 +334,14 @@ exports.addComment = async (req, res) => {
         const text = req.body.comment?.trim();
         if (!text) return res.status(400).json({ success: false, message: "Comment cannot be empty" });
 
-        const vibe = await Vibes.findById(req.params.id).select("_id comments");
+        const vibe = await Vibes.findById(req.params.id).select("_id comments user");
         if (!vibe) return res.status(404).json({ success: false, message: "Vibes not found" });
+        if (!(await canInteract(vibe.user, req.user.id, "comments"))) {
+            return res.status(403).json({ success: false, message: "Comments are limited by this account's privacy settings" });
+        }
+        if (await isCommentFiltered(vibe.user, text)) {
+            return res.status(400).json({ success: false, message: "This comment contains a blocked keyword" });
+        }
 
         const comment = await VibesComment.create({ vibe: vibe._id, user: req.user.id, comment: text });
         vibe.comments.addToSet(comment._id);
@@ -354,6 +361,14 @@ exports.addReply = async (req, res) => {
 
         const parent = await VibesComment.findOne({ _id: req.params.commentId, vibe: req.params.id });
         if (!parent) return res.status(404).json({ success: false, message: "Vibes comment not found" });
+        const vibe = await Vibes.findById(req.params.id).select("user").lean();
+        if (!vibe) return res.status(404).json({ success: false, message: "Vibes not found" });
+        if (!(await canInteract(vibe.user, req.user.id, "comments"))) {
+            return res.status(403).json({ success: false, message: "Replies are limited by this account's privacy settings" });
+        }
+        if (await isCommentFiltered(vibe.user, text)) {
+            return res.status(400).json({ success: false, message: "This reply contains a blocked keyword" });
+        }
 
         const reply = await VibesComment.create({
             vibe: req.params.id,

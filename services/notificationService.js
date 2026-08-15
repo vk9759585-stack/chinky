@@ -9,7 +9,7 @@ function stringData(data = {}) {
   );
 }
 
-exports.sendNotification = async (tokens, title, body, data = {}) => {
+exports.sendNotification = async (tokens, title, body, data = {}, options = {}) => {
   const list = [
     ...new Set(
       (Array.isArray(tokens) ? tokens : [tokens])
@@ -38,13 +38,16 @@ exports.sendNotification = async (tokens, title, body, data = {}) => {
         priority: "high",
         notification: {
           channelId: "chinky_social",
-          sound: "default",
+          sound: options.sound === false ? undefined : "default",
           priority: "high",
         },
       },
       apns: {
         payload: {
-          aps: { sound: "default", badge: 1 },
+          aps: {
+            sound: options.sound === false ? undefined : "default",
+            badge: 1,
+          },
         },
       },
     });

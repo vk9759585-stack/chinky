@@ -1,6 +1,7 @@
 const Comment = require("../models/Comment");
 const Post = require("../models/Post");
 const { createSocialNotification } = require("../services/socialNotificationService");
+const { canInteract, isCommentFiltered } = require("../services/privacyGuardService");
 
 // =====================================
 // GET COMMENTS
@@ -53,6 +54,13 @@ exports.addComment = async (req, res) => {
                 message: "Post not found"
             });
 
+        }
+
+        if (!(await canInteract(post.user, req.user.id, "comments"))) {
+            return res.status(403).json({ success: false, message: "Comments are limited by this account's privacy settings" });
+        }
+        if (await isCommentFiltered(post.user, text)) {
+            return res.status(400).json({ success: false, message: "This comment contains a blocked keyword" });
         }
 
         const comment = await Comment.create({
@@ -225,6 +233,13 @@ exports.addReply = async (req, res) => {
 
         if (!post || !parentComment) {
             return res.status(404).json({ success: false, message: "Post or comment not found" });
+        }
+
+        if (!(await canInteract(post.user, req.user.id, "comments"))) {
+            return res.status(403).json({ success: false, message: "Replies are limited by this account's privacy settings" });
+        }
+        if (await isCommentFiltered(post.user, text)) {
+            return res.status(400).json({ success: false, message: "This reply contains a blocked keyword" });
         }
 
         const reply = await Comment.create({

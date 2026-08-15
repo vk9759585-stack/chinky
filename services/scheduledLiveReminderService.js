@@ -15,9 +15,20 @@ async function tick() {
       const ids = follows.map(x=>x.follower);
       if (ids.length) {
         await Notification.insertMany(ids.map(receiver=>({ sender:live.host, receiver, type:"live", title:"Live starting soon", body:`${live.title} starts in about 15 minutes`, link:`/live/scheduled/${live._id}` })), { ordered:false }).catch(()=>{});
-        const users = await User.find({ _id:{ $in:ids } }).select("+fcmTokens").lean();
-        const tokens = users.flatMap(u=>u.fcmTokens||[]);
-        await sendNotification(tokens, "Live starting soon", `${live.title} starts in about 15 minutes`, { type:"scheduled_live", scheduleId:String(live._id) });
+        const users = await User.find({ _id:{ $in:ids } }).select("+fcmTokens appSettings").lean();
+        for (const user of users) {
+          const settings = user.appSettings || {};
+          if (settings.settings_notifications === false ||
+              settings.settings_quiet_mode === true ||
+              settings.settings_notify_live === false) continue;
+          const body = settings.settings_notify_preview === false
+            ? "Open CHINKY to view this notification."
+            : `${live.title} starts in about 15 minutes`;
+          await sendNotification(user.fcmTokens || [], "Live starting soon", body, {
+            type:"scheduled_live",
+            scheduleId:String(live._id),
+          }, { sound: settings.settings_notify_sound !== false });
+        }
       }
       live.reminderSent = true;
       await live.save();

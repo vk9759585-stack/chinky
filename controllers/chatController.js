@@ -2,6 +2,7 @@ const Chat = require("../models/Chat");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
 const { getSockets } = require("../socket/users");
+const { canDirectMessage } = require("../services/privacyGuardService");
 
 // ====================================
 // UPLOAD CHAT ATTACHMENT
@@ -62,6 +63,10 @@ exports.sendMessage = async (req, res) => {
             replyTo
 
         } = req.body;
+
+        if (!(await canDirectMessage(receiverId, req.user.id))) {
+            return res.status(403).json({ success: false, message: "This account is not accepting direct messages from you" });
+        }
 
         const receiverOnline = getSockets(receiverId).size > 0;
 
@@ -455,6 +460,10 @@ exports.forwardMessage = async (req, res) => {
 
         }
 
+        if (!(await canDirectMessage(req.body.receiverId, req.user.id))) {
+            return res.status(403).json({ success: false, message: "This account is not accepting direct messages from you" });
+        }
+
         const chat = await Chat.create({
 
             sender: req.user.id,
@@ -552,6 +561,10 @@ exports.pinMessage = async (req, res) => {
 exports.replyMessage = async (req, res) => {
 
     try {
+
+        if (!(await canDirectMessage(req.body.receiverId, req.user.id))) {
+            return res.status(403).json({ success: false, message: "This account is not accepting direct messages from you" });
+        }
 
         const chat = await Chat.create({
 

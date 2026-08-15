@@ -1,6 +1,7 @@
 const SparkComment = require("../models/SparkComment");
 const Spark = require("../models/Spark");
 const { createSocialNotification } = require("../services/socialNotificationService");
+const { canInteract, isCommentFiltered } = require("../services/privacyGuardService");
 
 const populatedComment = (id) => SparkComment.findById(id)
     .populate("user", "name username profileImage verified")
@@ -15,6 +16,12 @@ exports.addComment = async (req, res) => {
 
         const spark = await Spark.findById(reelId).select("_id comments user");
         if (!spark) return res.status(404).json({ success: false, message: "Spark not found" });
+        if (!(await canInteract(spark.user, req.user.id, "comments"))) {
+            return res.status(403).json({ success: false, message: "Comments are limited by this account's privacy settings" });
+        }
+        if (await isCommentFiltered(spark.user, text)) {
+            return res.status(400).json({ success: false, message: "This comment contains a blocked keyword" });
+        }
 
         const comment = await SparkComment.create({ reel: reelId, user: req.user.id, comment: text });
         spark.comments.addToSet(comment._id);
@@ -44,6 +51,14 @@ exports.addReply = async (req, res) => {
         if (!text) return res.status(400).json({ success: false, message: "Reply is required" });
         const parent = await SparkComment.findOne({ _id: req.params.commentId, reel: req.params.id });
         if (!parent) return res.status(404).json({ success: false, message: "Spark comment not found" });
+        const spark = await Spark.findById(req.params.id).select("user").lean();
+        if (!spark) return res.status(404).json({ success: false, message: "Spark not found" });
+        if (!(await canInteract(spark.user, req.user.id, "comments"))) {
+            return res.status(403).json({ success: false, message: "Replies are limited by this account's privacy settings" });
+        }
+        if (await isCommentFiltered(spark.user, text)) {
+            return res.status(400).json({ success: false, message: "This reply contains a blocked keyword" });
+        }
         const reply = await SparkComment.create({
             reel: req.params.id,
             user: req.user.id,

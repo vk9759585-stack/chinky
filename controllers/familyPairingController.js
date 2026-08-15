@@ -184,6 +184,9 @@ exports.updateControls = async (req, res) => {
       row.controls.dailyScreenTimeMinutes = Math.max(15, Math.min(1440, Math.floor(Number(next.dailyScreenTimeMinutes))));
     }
     await row.save();
+    if (typeof next.privateAccount === 'boolean' && row.teen) {
+      await User.updateOne({ _id: row.teen }, { $set: { isPrivate: next.privateAccount } });
+    }
     return res.json({ success: true, data: { id: String(row._id), controls: row.controls } });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Family controls could not be saved.' });
