@@ -33,6 +33,12 @@ router.put(
     controller.endCall
 );
 
+router.put(
+    "/miss/:id",
+    auth,
+    controller.missCall
+);
+
 // ===================================
 // REJECT CALL
 // ===================================
@@ -51,6 +57,12 @@ router.get(
     "/history",
     auth,
     controller.getCallHistory
+);
+
+router.get(
+    "/:id",
+    auth,
+    controller.getCall
 );
 
 module.exports = router;

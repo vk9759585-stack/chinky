@@ -108,6 +108,12 @@ exports.getVibes = async (req, res) => {
                     owner.followers.some((id) => id.toString() === viewerId)
                 );
             })
+            .sort((a, b) => {
+                const aMine = a.user?._id?.toString() === viewerId;
+                const bMine = b.user?._id?.toString() === viewerId;
+                if (aMine !== bMine) return aMine ? -1 : 1;
+                return new Date(b.createdAt) - new Date(a.createdAt);
+            })
             .slice(0, limit)
             .map((vibe) => {
                 const item = vibe.toObject();

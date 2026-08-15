@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const LiveSession = require('../models/LiveSession');
 const User = require('../models/User');
 const Gift = require('../models/Gift');
+const LiveBattle = require('../models/LiveBattle');
 const { getGift, splitCoins } = require('../config/monetization');
 const { changeCoins, creditCreatorEarnings, runFinancialTransaction } = require('../services/walletAccountingService');
 
@@ -41,7 +42,7 @@ const serialize = (session) => ({
   isLive: session.isLive === true,
 });
 
-exports.createZegoToken = (req, res) => {
+exports.createZegoToken = async (req, res) => {
   const appID = Number(process.env.ZEGO_APP_ID);
   const serverSecret = process.env.ZEGO_SERVER_SECRET || "";
   const liveID = String(req.body.liveID || "").trim();
@@ -50,9 +51,12 @@ exports.createZegoToken = (req, res) => {
   if (![16, 24, 32].includes(Buffer.byteLength(serverSecret))) return res.status(500).json({ success: false, message: "Invalid ZEGOCLOUD server secret." });
   try {
     const userID = String(req.user.id).replace(/[^A-Za-z0-9_]/g, "_");
+    const user = await User.findById(req.user.id).select('name username');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+    const userName = user.name || user.username || 'Chinky user';
     const payload = JSON.stringify({ room_id: liveID, privilege: { 1: 1, 2: 1 }, stream_id_list: null });
     const token = token04(appID, userID, serverSecret, 3600, payload);
-    return res.json({ success: true, appID, userID, liveID, token, expiresIn: 3600 });
+    return res.json({ success: true, appID, userID, userName, liveID, token, expiresIn: 3600 });
   } catch (_) {
     return res.status(500).json({ success: false, message: "Could not create live token." });
   }

@@ -150,6 +150,28 @@ exports.rejectCall = async (req, res) => {
     }
 };
 
+exports.missCall = async (req, res) => {
+    try {
+        const call = await Call.findOneAndUpdate(
+            {
+                _id: req.params.id,
+                caller: req.user.id,
+                status: { $in: ["calling", "ringing"] }
+            },
+            { status: "missed", endedAt: new Date() },
+            { new: true }
+        );
+        const io = req.app.get("io");
+        if (io && call) {
+            io.to(`user:${call.receiver}`).emit("call:ended", call.toObject());
+            io.to(`user:${call.caller}`).emit("call:ended", call.toObject());
+        }
+        return res.json({ success: true, data: call });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // ======================================
 // END CALL
 // ======================================
@@ -194,6 +216,22 @@ exports.endCall = async (req, res) => {
             success: false,
             message: err.message
         });
+    }
+};
+
+
+exports.getCall = async (req, res) => {
+    try {
+        const call = await Call.findOne({
+            _id: req.params.id,
+            $or: [{ caller: req.user.id }, { receiver: req.user.id }]
+        });
+        if (!call) {
+            return res.status(404).json({ success: false, message: "Call not found" });
+        }
+        return res.json({ success: true, data: call });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
 

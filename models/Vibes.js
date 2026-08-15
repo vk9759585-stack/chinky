@@ -1,5 +1,7 @@
 const mongoose = require("mongoose");
 
+// Legacy collection compatibility: keep the existing Mongo model/collection name
+// so previously published Vibes remain visible after app updates.
 const storySchema = new mongoose.Schema(
     {
         user: {
