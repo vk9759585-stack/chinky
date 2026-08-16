@@ -1,6 +1,6 @@
 /** Server-authoritative CHINKY monetization rules. */
-const CREATOR_GIFT_SHARE_BPS = 5000;
-const PLATFORM_GIFT_SHARE_BPS = 5000;
+const CREATOR_GIFT_SHARE_BPS = 2000; // 5 gifted Coins = 1 earned Diamond.
+const PLATFORM_GIFT_SHARE_BPS = 8000;
 const SPARK_GIFT_MIN_FOLLOWERS = 0;
 
 // User-side service fees. Backend-authoritative and configurable via environment.
@@ -30,7 +30,7 @@ const withPurchaseFee = (coinPackage) => {
 // CHINKY purchase packs configured for India pricing.
 // Never trust a client-supplied amount. The backend resolves every amount.
 const PURCHASE_COINS_PER_10_RUPEES = 0; // Fixed packs only; no public rupee-to-coin rate.
-const WITHDRAW_DIAMONDS_PER_10_RUPEES = 10; // 10 earned Diamonds = ₹10.
+const WITHDRAW_DIAMONDS_PER_10_RUPEES = 10; // 10 earned Diamonds = ₹10 (1 Diamond = ₹1).
 const PURCHASE_COINS_PER_RUPEE = 0;
 const WITHDRAW_COINS_PER_RUPEE = 1;
 const PURCHASE_TO_WITHDRAW_MARGIN_PERCENT = 0; // Internal economics are not shown as a UI percentage.
@@ -70,12 +70,12 @@ const fixedPackage = (id, coins, rupees) => Object.freeze({
 });
 
 const COIN_PACKAGES = Object.freeze([
-  fixedPackage('coins_30', 30, 39),
-  fixedPackage('coins_65', 65, 79),
-  fixedPackage('coins_125', 125, 149),
-  fixedPackage('coins_260', 260, 299),
-  fixedPackage('coins_450', 450, 499),
-  fixedPackage('coins_950', 950, 999),
+  fixedPackage('coins_90', 90, 39),
+  fixedPackage('coins_185', 185, 79),
+  fixedPackage('coins_350', 350, 149),
+  fixedPackage('coins_700', 700, 299),
+  fixedPackage('coins_1175', 1175, 499),
+  fixedPackage('coins_2350', 2350, 999),
 ]);
 
 const getCoinPackage = (id) => COIN_PACKAGES.find((item) => item.id === id);

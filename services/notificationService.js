@@ -36,10 +36,14 @@ exports.sendNotification = async (tokens, title, body, data = {}, options = {}) 
       data: stringData(data),
       android: {
         priority: "high",
+        ttl: Number.isFinite(Number(options.ttlMs))
+          ? Number(options.ttlMs)
+          : 60 * 60 * 1000,
         notification: {
-          channelId: "chinky_social",
+          channelId: options.channelId || "chinky_social",
           sound: options.sound === false ? undefined : "default",
-          priority: "high",
+          priority: "max",
+          visibility: "public",
         },
       },
       apns: {

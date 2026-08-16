@@ -5,7 +5,18 @@ const Gift = require('../models/Gift');
 const { COIN_PACKAGES, GIFT_CATALOG, PURCHASE_COINS_PER_10_RUPEES, WITHDRAW_DIAMONDS_PER_10_RUPEES, MINIMUM_PURCHASE_PAISE, MINIMUM_WITHDRAWAL_COINS, withPurchaseFee, withdrawalFeePaise } = require('../config/monetization');
 const { getOrCreateWallet, debitEarnedCoins, runFinancialTransaction } = require('../services/walletAccountingService');
 
-exports.getWallet = async (req, res) => { try { res.json({ success: true, data: await getOrCreateWallet(req.user.id) }); } catch (e) { res.status(500).json({ success: false, message: e.message }); } };
+exports.getWallet = async (req, res) => {
+  try {
+    const wallet = await getOrCreateWallet(req.user.id);
+    const data = wallet.toObject ? wallet.toObject() : wallet;
+    data.giftableCoins = Number(data.purchasedCoins || 0);
+    data.freeRewardCoins = Number(data.rewardCoins || 0);
+    data.withdrawableDiamonds = Number(data.earnedCoins || 0);
+    return res.json({ success: true, data });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+};
 exports.addCoins = async (_, res) => res.status(405).json({ success: false, message: 'Direct coin credits are disabled.' });
 exports.removeCoins = async (req, res) => { try { const coins = Math.floor(Number(req.body.coins || 0)); const w = await Wallet.findOne({ user: req.user.id }); if (!w || coins <= 0 || w.coins < coins) return res.status(400).json({ success: false, message: 'Insufficient balance' }); w.coins -= coins; await w.save(); return res.json({ success: true, data: w }); } catch (e) { return res.status(500).json({ success: false, message: e.message }); } };
 exports.getCoinPackages = (_, res) => res.json({ success: true, data: COIN_PACKAGES.map(withPurchaseFee) });

@@ -453,6 +453,11 @@ app.get("/download", (req, res) => {
   return res.redirect(302, downloadUrl);
 });
 
+app.get("/website", (req, res) => {
+  res.setHeader("Cache-Control", "no-cache");
+  return res.sendFile(path.join(websiteRoot, "index.html"));
+});
+
 app.get("/", (req, res) => {
   res.set("Cache-Control", "no-cache");
   return res.sendFile(path.join(websiteRoot, "index.html"));

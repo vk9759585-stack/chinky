@@ -102,6 +102,11 @@ exports.startCall = async (req, res) => {
                     callType: call.type,
                     username: callerName,
                     profileImage: callerImage
+                },
+                {
+                    channelId: "chinky_calls",
+                    ttlMs: 45 * 1000,
+                    sound: true
                 }
             ).catch(() => {});
         }

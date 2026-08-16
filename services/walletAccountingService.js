@@ -32,6 +32,16 @@ function debitBuckets(wallet, amount) {
   if (remaining > 0) throw new Error('Insufficient coin balance');
 }
 
+function debitPurchasedCoins(wallet, amount) {
+  normalizeBuckets(wallet);
+  if (wallet.purchasedCoins < amount) {
+    const error = new Error('Not enough purchased Coins. Free reward Coins cannot be used for gifts.');
+    error.code = 'PURCHASED_COINS_REQUIRED';
+    throw error;
+  }
+  wallet.purchasedCoins -= amount;
+}
+
 async function ledger({ user, transactionType, coinDelta, before, after, referenceType, referenceId, metadata, session }) {
   await WalletLedger.create([{
     user, transactionType, coinDelta, balanceBefore: before, balanceAfter: after,
@@ -46,7 +56,12 @@ async function changeCoins({ user, delta, transactionType, referenceType, refere
   const before = Number(wallet.coins || 0);
   if (delta < 0) {
     if (before < -delta) throw new Error('Insufficient coin balance');
-    debitBuckets(wallet, -delta);
+    const purchasedOnly = ['spark_gift_sent', 'live_gift_sent', 'gift_sent'].includes(transactionType);
+    if (purchasedOnly) {
+      debitPurchasedCoins(wallet, -delta);
+    } else {
+      debitBuckets(wallet, -delta);
+    }
     wallet.totalCoinsSpent += -delta;
     wallet.totalSpent += -delta;
   } else if (transactionType === 'coin_purchase') {
