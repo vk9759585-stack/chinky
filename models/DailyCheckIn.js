@@ -27,6 +27,23 @@ const dailyCheckInSchema = new mongoose.Schema({
     default: 0,
     min: 0,
   },
+  adRewardDay: {
+    type: String,
+    default: '',
+    index: true,
+  },
+  adsWatchedToday: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 5,
+  },
+  adCoinsToday: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 15,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('DailyCheckIn', dailyCheckInSchema);

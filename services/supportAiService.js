@@ -140,13 +140,18 @@ function fallbackAnalysis(message, categoryHint = "") {
   const escalation = needsHuman
     ? (language === "en" ? " A human support agent will review this ticket." : " Human support agent is ticket ko review karega.")
     : "";
+  const actionText = (selected.actions || []).length
+    ? (language === "en"
+        ? ` Next steps: ${selected.actions.join(" • ")}`
+        : ` Ab ye try karein: ${selected.actions.join(" • ")}`)
+    : "";
   return {
     language,
     category: selected.category,
     priority,
     subject: shortSubject(message, selected.title),
     summary: selected.title,
-    reply: `${intro} ${selected.answer}${escalation}`.trim(),
+    reply: `${intro} ${selected.answer}${actionText}${escalation}`.trim(),
     needsHuman,
     escalationReason: needsHuman ? (askedForHuman ? "User requested a human agent" : `Human review required for ${selected.category}`) : "",
     canAutoResolve: !needsHuman && ["technical", "account"].includes(selected.category),
@@ -171,23 +176,42 @@ function extractOutputText(response) {
   return "";
 }
 
-async function openAiRequest(path, body, timeoutMs = 14000) {
+async function openAiRequest(path, body, timeoutMs = 26000) {
   const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(`https://api.openai.com/v1${path}`, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
-    if (!response.ok) throw new Error(`OpenAI request failed (${response.status})`);
-    return response.json();
-  } finally {
-    clearTimeout(timer);
+
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(`https://api.openai.com/v1${path}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+      if (response.ok) return response.json();
+
+      const errorText = await response.text().catch(() => "");
+      lastError = new Error(
+        `OpenAI request failed (${response.status})${errorText ? `: ${errorText.slice(0, 240)}` : ""}`
+      );
+      if (![408, 409, 429, 500, 502, 503, 504].includes(response.status)) {
+        throw lastError;
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt >= 1) throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 450));
   }
+  throw lastError || new Error("AI request failed");
 }
 
 async function moderationResult(message) {
@@ -239,7 +263,7 @@ async function analyzeSupportMessage({ message, userId, history = [], categoryHi
   const sanitized = cleanText(message);
   const fallback = fallbackAnalysis(sanitized, categoryHint);
   const provider = String(process.env.CHINKY_AI_PROVIDER || "auto").trim().toLowerCase();
-  const model = String(process.env.CHINKY_AI_MODEL || process.env.OPENAI_SUPPORT_MODEL || "gpt-5.6-luna").trim();
+  const model = String(process.env.CHINKY_AI_MODEL || process.env.OPENAI_SUPPORT_MODEL || "gpt-5.6").trim();
   if (!["auto", "openai", "local_rules"].includes(provider) || provider === "local_rules" || !String(process.env.OPENAI_API_KEY || "").trim()) {
     return fallback;
   }
@@ -254,7 +278,7 @@ async function analyzeSupportMessage({ message, userId, history = [], categoryHi
         store: false,
         safety_identifier: crypto.createHash("sha256").update(`chinky-support:${userId}`).digest("hex").slice(0, 32),
         reasoning: { effort: "low" },
-        max_output_tokens: 900,
+        max_output_tokens: 1400,
         input: [
           { role: "system", content: [{ type: "input_text", text: systemPrompt }] },
           {

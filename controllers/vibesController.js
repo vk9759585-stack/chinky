@@ -2,6 +2,11 @@ const Vibes = require("../models/Vibes");
 const VibesComment = require("../models/VibesComment");
 const { canInteract, isCommentFiltered } = require("../services/privacyGuardService");
 const cloudinary = require("../config/cloudinary");
+const {
+    uploadOptions: moderationUploadOptions,
+    moderationStatus,
+    isRejected: moderationRejected
+} = require("../services/contentModerationService");
 const fs = require("fs");
 const Audio = require("../models/Audio");
 
@@ -94,7 +99,13 @@ exports.getVibes = async (req, res) => {
     try {
         const limit = Math.min(Math.max(Number(req.query.limit) || 40, 10), 60);
         const viewerId = req.user.id.toString();
-        const vibes = await Vibes.find({ expiresAt: { $gt: new Date() } })
+        const vibes = await Vibes.find({
+            expiresAt: { $gt: new Date() },
+            $or: [
+                { moderationStatus: { $exists: false } },
+                { moderationStatus: "approved" }
+            ]
+        })
             .populate("user", "name username profileImage verified isPrivate isDeactivated followers")
             .sort({ createdAt: -1 })
             .limit(limit * 2);
@@ -163,15 +174,48 @@ exports.createVibes = async (req, res) => {
             const upload = await cloudinary.uploader.upload(mediaFile.path, {
                 resource_type: isVideo ? "video" : "image",
                 folder: "chinky/vibes",
-                transformation: [{ width: qualityWidth, crop: "limit" }]
+                transformation: [{ width: qualityWidth, crop: "limit" }],
+                ...moderationUploadOptions(isVideo ? "video" : "image")
             });
+
+            if (moderationRejected(upload)) {
+                await cloudinary.uploader.destroy(upload.public_id, {
+                    resource_type: isVideo ? "video" : "image",
+                    invalidate: true
+                }).catch(() => {});
+                await fs.promises.unlink(mediaFile.path).catch(() => {});
+                await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
+                return res.status(422).json({
+                    success: false,
+                    code: "sexual_content_detected",
+                    message: "Vibe removed: sexual or adult content is not allowed."
+                });
+            }
 
             if (overlayFile) {
                 const overlayUpload = await cloudinary.uploader.upload(overlayFile.path, {
                     resource_type: "image",
                     folder: "chinky/overlays",
-                    transformation: [{ width: 1200, crop: "limit" }]
+                    transformation: [{ width: 1200, crop: "limit" }],
+                    ...moderationUploadOptions("image")
                 });
+                if (moderationRejected(overlayUpload)) {
+                    await cloudinary.uploader.destroy(overlayUpload.public_id, {
+                        resource_type: "image",
+                        invalidate: true
+                    }).catch(() => {});
+                    await cloudinary.uploader.destroy(upload.public_id, {
+                        resource_type: isVideo ? "video" : "image",
+                        invalidate: true
+                    }).catch(() => {});
+                    await fs.promises.unlink(mediaFile.path).catch(() => {});
+                    await fs.promises.unlink(overlayFile.path).catch(() => {});
+                    return res.status(422).json({
+                        success: false,
+                        code: "sexual_content_detected",
+                        message: "Vibe removed: sexual or adult content is not allowed."
+                    });
+                }
                 edit.overlayImageUrl = overlayUpload.secure_url || "";
             }
 
@@ -182,6 +226,9 @@ exports.createVibes = async (req, res) => {
                 user: req.user.id,
                 uploadKey,
                 media: upload.secure_url,
+                mediaPublicId: upload.public_id || "",
+                moderationStatus: moderationStatus(upload),
+                moderationKind: isVideo ? "aws_rek_video" : "aws_rek",
                 isVideo,
                 caption: (req.body.caption || "").trim(),
                 filter: edit.filter,

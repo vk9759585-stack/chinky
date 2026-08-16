@@ -1,6 +1,12 @@
 const Post = require("../models/Post");
 const User = require("../models/User");
 const cloudinary = require("../config/cloudinary");
+const {
+    enabled: moderationEnabled,
+    uploadOptions: moderationUploadOptions,
+    moderationStatus,
+    isRejected: moderationRejected
+} = require("../services/contentModerationService");
 const fs = require("fs");
 const Audio = require("../models/Audio");
 
@@ -147,15 +153,48 @@ exports.createPost = async (req, res) => {
             const result = await cloudinary.uploader.upload(mediaFile.path, {
                 resource_type: mediaType,
                 folder: `chinky/posts/${mediaType}s`,
-                transformation: [{ width: qualityWidth, crop: "limit" }]
+                transformation: [{ width: qualityWidth, crop: "limit" }],
+                ...moderationUploadOptions(mediaType)
             });
+
+            if (moderationRejected(result)) {
+                await cloudinary.uploader.destroy(result.public_id, {
+                    resource_type: mediaType,
+                    invalidate: true
+                }).catch(() => {});
+                await removeTemporaryUpload(mediaFile.path);
+                await removeTemporaryUpload(overlayFile?.path);
+                return res.status(422).json({
+                    success: false,
+                    code: "sexual_content_detected",
+                    message: "Upload removed: sexual or adult content is not allowed."
+                });
+            }
 
             if (overlayFile) {
                 const overlayUpload = await cloudinary.uploader.upload(overlayFile.path, {
                     resource_type: "image",
                     folder: "chinky/overlays",
-                    transformation: [{ width: 1200, crop: "limit" }]
+                    transformation: [{ width: 1200, crop: "limit" }],
+                    ...moderationUploadOptions("image")
                 });
+                if (moderationRejected(overlayUpload)) {
+                    await cloudinary.uploader.destroy(overlayUpload.public_id, {
+                        resource_type: "image",
+                        invalidate: true
+                    }).catch(() => {});
+                    await cloudinary.uploader.destroy(result.public_id, {
+                        resource_type: mediaType,
+                        invalidate: true
+                    }).catch(() => {});
+                    await removeTemporaryUpload(mediaFile.path);
+                    await removeTemporaryUpload(overlayFile.path);
+                    return res.status(422).json({
+                        success: false,
+                        code: "sexual_content_detected",
+                        message: "Upload removed: sexual or adult content is not allowed."
+                    });
+                }
                 edit.overlayImageUrl = overlayUpload.secure_url || "";
             }
 
@@ -163,6 +202,9 @@ exports.createPost = async (req, res) => {
                 user: req.user.id,
                 uploadKey,
                 image: result.secure_url,
+                mediaPublicId: result.public_id || "",
+                moderationStatus: moderationStatus(result),
+                moderationKind: mediaType === "video" ? "aws_rek_video" : "aws_rek",
                 thumbnail: mediaType === "video" ? cloudinaryVideoThumbnail(result) : result.secure_url,
                 mediaType,
                 caption: req.body.caption || "",
@@ -228,7 +270,12 @@ exports.getFlow = async (req, res) => {
             req.user._id ||
             req.user.userId;
 
-        const posts = await Post.find()
+        const posts = await Post.find({
+            $or: [
+                { moderationStatus: { $exists: false } },
+                { moderationStatus: "approved" }
+            ]
+        })
             .populate(
                 "user",
                 "name username profileImage verified isPrivate isDeactivated followers"

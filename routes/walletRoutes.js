@@ -11,6 +11,7 @@ router.get('/monetization', auth, wallet.getMonetizationConfig);
 router.get('/withdrawals', auth, wallet.getWithdrawalRequests);
 router.post('/withdrawals', auth, wallet.createWithdrawalRequest);
 router.get('/check-in', auth, checkin.getStatus);
+router.post('/check-in/ad-reward', auth, checkin.claimAdReward);
 router.post('/check-in/claim', auth, checkin.claim);
 router.put('/coins', auth, wallet.addCoins);
 module.exports = router;

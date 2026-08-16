@@ -8,6 +8,7 @@ function preferenceKey(type) {
   if (type === "follow") return "settings_notify_followers";
   if (["message", "call"].includes(type)) return "settings_notify_messages";
   if (type === "live") return "settings_notify_live";
+  if (type === "gift") return "settings_notify_wallet";
   if (["verification", "support"].includes(type)) return "settings_notify_security";
   return null;
 }
@@ -43,7 +44,7 @@ async function createSocialNotification(req, payload) {
 
     const io = req?.app?.get("io");
     if (io && populated) {
-      io.to(receiver).emit("notification", populated);
+      io.to(`user:${receiver}`).emit("notification", populated);
     }
   } catch (error) {
     console.error("Realtime notification emit failed:", error.message);

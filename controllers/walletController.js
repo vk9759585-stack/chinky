@@ -12,39 +12,97 @@ exports.getCoinPackages = (_, res) => res.json({ success: true, data: COIN_PACKA
 
 exports.getReceivedGifts = async (req, res) => {
   try {
-    const query = { receiver: req.user.id, status: 'completed' };
-    const [rows, count, totals] = await Promise.all([
-      Gift.find(query).populate('sender', 'name username profileImage verified').sort({ createdAt: -1 }).limit(100).lean(),
+    const mongoose = require("mongoose");
+    const receiverId = new mongoose.Types.ObjectId(req.user.id);
+    const query = { receiver: receiverId, status: "completed" };
+
+    const [rows, count, totals, senderStats] = await Promise.all([
+      Gift.find(query)
+        .populate("sender", "name username profileImage verified")
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .lean(),
       Gift.countDocuments(query),
-      Gift.aggregate([{ $match: { receiver: new (require('mongoose').Types.ObjectId)(req.user.id), status: 'completed' } }, { $group: { _id: null, totalCoins: { $sum: '$coins' } } }]),
+      Gift.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: null,
+            totalCoins: { $sum: "$coins" },
+            totalGiftEvents: { $sum: 1 }
+          }
+        }
+      ]),
+      Gift.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: "$sender",
+            giftCount: { $sum: 1 },
+            totalCoins: { $sum: "$coins" },
+            lastGiftAt: { $max: "$createdAt" }
+          }
+        },
+        { $sort: { totalCoins: -1, giftCount: -1, lastGiftAt: -1 } },
+        { $limit: 100 },
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "_id",
+            as: "sender"
+          }
+        },
+        { $unwind: { path: "$sender", preserveNullAndEmptyArrays: true } }
+      ])
     ]);
+
     const totalCoins = totals[0]?.totalCoins || 0;
+    const totalGiftEvents = totals[0]?.totalGiftEvents || count;
+
     return res.json({
       success: true,
       data: {
         count,
+        totalGiftEvents,
         totalCoins,
+        topGifters: senderStats.map(row => ({
+          senderId: row._id ? String(row._id) : "",
+          name: row.sender?.name || "",
+          username: row.sender?.username || "",
+          profileImage: row.sender?.profileImage || "",
+          verified: row.sender?.verified === true,
+          giftCount: row.giftCount || 0,
+          totalCoins: row.totalCoins || 0,
+          lastGiftAt: row.lastGiftAt
+        })),
         gifts: rows.map(row => ({
           id: String(row._id),
           giftName: row.giftName,
+          quantity: 1,
           coins: row.coins || 0,
+          totalCoins: row.coins || 0,
           sourceType: row.sourceType,
           sourceId: row.sourceId,
           createdAt: row.createdAt,
           sender: row.sender ? {
             id: String(row.sender._id),
-            name: row.sender.name || '',
-            username: row.sender.username || '',
-            profileImage: row.sender.profileImage || '',
-            verified: row.sender.verified === true,
-          } : null,
-        })),
-      },
+            name: row.sender.name || "",
+            username: row.sender.username || "",
+            profileImage: row.sender.profileImage || "",
+            verified: row.sender.verified === true
+          } : null
+        }))
+      }
     });
   } catch (e) {
-    return res.status(500).json({ success: false, message: 'Gift history could not be loaded.' });
+    return res.status(500).json({
+      success: false,
+      message: "Gift history could not be loaded."
+    });
   }
 };
+
 exports.getGiftCatalog = (_, res) => res.json({ success: true, data: { purchaseCoinsPer10Rupees: 0, withdrawDiamondsPer10Rupees: WITHDRAW_DIAMONDS_PER_10_RUPEES, gifts: GIFT_CATALOG } });
 exports.getMonetizationConfig = (_, res) => res.json({ success: true, data: { purchaseCoinsPer10Rupees: 0, withdrawDiamondsPer10Rupees: WITHDRAW_DIAMONDS_PER_10_RUPEES, minimumPurchasePaise: MINIMUM_PURCHASE_PAISE, minimumWithdrawalDiamonds: MINIMUM_WITHDRAWAL_COINS, showCommissionPercentage: false } });
 exports.getActivity = async (req, res) => { try { const rows = await WalletLedger.find({ user: req.user.id }).sort({ createdAt: -1 }).limit(30).lean(); return res.json({ success: true, data: rows.map(x => ({ id: String(x._id), type: x.transactionType, coinDelta: x.coinDelta || 0, earningDeltaPaise: x.earningDeltaPaise || 0, createdAt: x.createdAt, metadata: x.metadata || {} })) }); } catch (_) { return res.status(500).json({ success: false, message: 'Wallet activity could not be loaded.' }); } };

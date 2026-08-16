@@ -52,15 +52,28 @@ function makeStatus(record, walletCoins, now = new Date()) {
     };
   });
 
+  const today = dayKey(now);
+  const adsWatchedToday = record?.adRewardDay === today
+    ? Math.max(0, Math.min(5, Number(record?.adsWatchedToday || 0)))
+    : 0;
+  const adCoinsToday = record?.adRewardDay === today
+    ? Math.max(0, Number(record?.adCoinsToday || 0))
+    : 0;
+
   return {
     streak: state.effectiveStreak,
     claimedToday: state.claimedToday,
-    canClaim: !state.claimedToday,
+    canClaim: !state.claimedToday && adsWatchedToday >= 5,
     targetDay: state.targetDay,
     nextReward: DAILY_CHECKIN_REWARDS[state.targetDay - 1],
     walletCoins: Number(walletCoins || 0),
     lastClaimDay: record?.lastClaimDay || null,
     completedCycles: Number(record?.completedCycles || 0),
+    adsRequired: 5,
+    adsWatchedToday,
+    adsRemaining: Math.max(0, 5 - adsWatchedToday),
+    adRewardCoins: 3,
+    adCoinsToday,
     days,
   };
 }
@@ -84,6 +97,65 @@ exports.getStatus = async (req, res) => {
   }
 };
 
+exports.claimAdReward = async (req, res) => {
+  try {
+    const now = new Date();
+    const today = dayKey(now);
+
+    const result = await runFinancialTransaction(async (session) => {
+      let record = await DailyCheckIn.findOne({ user: req.user.id }).session(session);
+      if (!record) record = new DailyCheckIn({ user: req.user.id });
+
+      if (record.lastClaimDay === today) {
+        const wallet = await getOrCreateWallet(req.user.id, session);
+        return { alreadyFinished: true, wallet, record, reward: 0 };
+      }
+
+      if (record.adRewardDay !== today) {
+        record.adRewardDay = today;
+        record.adsWatchedToday = 0;
+        record.adCoinsToday = 0;
+      }
+
+      if (Number(record.adsWatchedToday || 0) >= 5) {
+        const wallet = await getOrCreateWallet(req.user.id, session);
+        return { alreadyFinished: true, wallet, record, reward: 0 };
+      }
+
+      const slot = Number(record.adsWatchedToday || 0) + 1;
+      record.adsWatchedToday = slot;
+      record.adCoinsToday = Number(record.adCoinsToday || 0) + 3;
+      await record.save({ session });
+
+      const wallet = await creditRewardCoins({
+        user: req.user.id,
+        coins: 3,
+        transactionType: 'daily_rewarded_ad',
+        referenceType: 'daily_rewarded_ad',
+        referenceId: `${today}:${slot}`,
+        metadata: { day: today, slot, reward: 3 },
+        session,
+      });
+
+      return { alreadyFinished: false, wallet, record, reward: 3 };
+    });
+
+    return res.json({
+      success: true,
+      reward: result.reward,
+      message: result.reward > 0
+        ? `Video completed. +${result.reward} coins added.`
+        : "Today's ad rewards are already complete.",
+      data: makeStatus(result.record, result.wallet.coins, now),
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'Could not credit video reward.',
+    });
+  }
+};
+
 exports.claim = async (req, res) => {
   try {
     const now = new Date();
@@ -100,6 +172,18 @@ exports.claim = async (req, res) => {
           wallet,
           record,
         };
+      }
+
+      const adsToday = record?.adRewardDay === today
+        ? Number(record?.adsWatchedToday || 0)
+        : 0;
+      if (adsToday < 5) {
+        const remaining = 5 - adsToday;
+        const error = new Error(
+          `Watch ${remaining} more rewarded video${remaining === 1 ? '' : 's'} before claiming today's check-in.`
+        );
+        error.code = 'ADS_REQUIRED';
+        throw error;
       }
 
       const yesterday = previousDayKey(now);
@@ -152,6 +236,20 @@ exports.claim = async (req, res) => {
       data: makeStatus(result.record, result.wallet.coins, now),
     });
   } catch (err) {
+    if (err?.code === 'ADS_REQUIRED') {
+      try {
+        const [record, wallet] = await Promise.all([
+          DailyCheckIn.findOne({ user: req.user.id }).lean(),
+          getOrCreateWallet(req.user.id),
+        ]);
+        return res.status(409).json({
+          success: false,
+          message: err.message,
+          data: makeStatus(record, wallet.coins),
+        });
+      } catch (_) {}
+    }
+
     // A unique-user race can happen only if the same account sends the very first
     // claim twice at exactly the same moment. Return the authoritative status.
     if (err?.code === 11000) {

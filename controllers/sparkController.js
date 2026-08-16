@@ -2,6 +2,12 @@ const mongoose = require("mongoose");
 const Spark = require("../models/Spark");
 const Report = require("../models/Report");
 const cloudinary = require("../config/cloudinary");
+const {
+    enabled: moderationEnabled,
+    uploadOptions: moderationUploadOptions,
+    moderationStatus,
+    isRejected: moderationRejected
+} = require("../services/contentModerationService");
 const fs = require("fs");
 const Wallet = require("../models/Wallet");
 const Gift = require("../models/Gift");
@@ -154,13 +160,37 @@ exports.createSpark = async (req, res) => {
             const upload = await cloudinary.uploader.upload(videoFile.path, {
                 resource_type: "video",
                 folder: "chinky/sparks",
-                transformation: [{ width: qualityWidth, crop: "limit" }]
+                transformation: [{ width: qualityWidth, crop: "limit" }],
+                ...moderationUploadOptions("video")
             });
+            if (moderationRejected(upload)) {
+                await cloudinary.uploader.destroy(upload.public_id, {
+                    resource_type: "video",
+                    invalidate: true
+                }).catch(() => {});
+                await fs.promises.unlink(videoFile.path).catch(() => {});
+                await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
+                return res.status(422).json({
+                    success: false,
+                    code: "sexual_content_detected",
+                    message: "Spark removed: sexual or adult content is not allowed."
+                });
+            }
             videoUrl = upload.secure_url;
             videoPublicId = upload.public_id || "";
+            var videoModerationStatus = moderationStatus(upload);
             if (!thumbnail) thumbnail = sparkThumbnail(upload);
             await fs.promises.unlink(videoFile.path).catch(() => {});
-        } catch (_) {
+        } catch (error) {
+            if (moderationEnabled) {
+                await fs.promises.unlink(videoFile.path).catch(() => {});
+                await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
+                return res.status(503).json({
+                    success: false,
+                    code: "moderation_unavailable",
+                    message: "Safety scan is temporarily unavailable. Please retry the upload."
+                });
+            }
             videoUrl = `${req.protocol}://${req.get("host")}/uploads/${videoFile.filename}`;
         }
 
@@ -169,8 +199,27 @@ exports.createSpark = async (req, res) => {
                 const overlayUpload = await cloudinary.uploader.upload(overlayFile.path, {
                     resource_type: "image",
                     folder: "chinky/overlays",
-                    transformation: [{ width: 1200, crop: "limit" }]
+                    transformation: [{ width: 1200, crop: "limit" }],
+                    ...moderationUploadOptions("image")
                 });
+                if (moderationRejected(overlayUpload)) {
+                    await cloudinary.uploader.destroy(overlayUpload.public_id, {
+                        resource_type: "image",
+                        invalidate: true
+                    }).catch(() => {});
+                    if (videoPublicId) {
+                        await cloudinary.uploader.destroy(videoPublicId, {
+                            resource_type: "video",
+                            invalidate: true
+                        }).catch(() => {});
+                    }
+                    await fs.promises.unlink(overlayFile.path).catch(() => {});
+                    return res.status(422).json({
+                        success: false,
+                        code: "sexual_content_detected",
+                        message: "Spark removed: sexual or adult content is not allowed."
+                    });
+                }
                 edit.overlayImageUrl = overlayUpload.secure_url || "";
                 await fs.promises.unlink(overlayFile.path).catch(() => {});
             } catch (_) {
@@ -185,6 +234,8 @@ exports.createSpark = async (req, res) => {
             caption: req.body.caption || "",
             video: videoUrl,
             videoPublicId,
+            moderationStatus: videoModerationStatus || (moderationEnabled ? "pending" : "approved"),
+            moderationKind: moderationEnabled ? "aws_rek_video" : "",
             thumbnail,
             music: req.body.music || "",
             audio: req.body.audioId || null,
@@ -254,7 +305,15 @@ exports.getSparks = async (req, res) => {
         const viewerId = (req.user.id || req.user._id || req.user.userId).toString();
         const limit = Math.min(Math.max(Number(req.query.limit) || 15, 1), 30);
         const before = req.query.before ? new Date(req.query.before) : null;
-        const filter = before && !Number.isNaN(before.getTime()) ? { createdAt: { $lt: before } } : {};
+        const filter = {
+            ...(before && !Number.isNaN(before.getTime())
+                ? { createdAt: { $lt: before } }
+                : {}),
+            $or: [
+                { moderationStatus: { $exists: false } },
+                { moderationStatus: "approved" }
+            ]
+        };
 
         // Fetch a small page instead of loading the whole Spark collection.
         // A little over-fetch helps after private-account filtering.
@@ -484,8 +543,15 @@ exports.sendGift = async (req, res) => {
             });
             return { gift: gift[0], coins: senderWallet.coins };
         });
-        await Notification.create({ sender: req.user.id, receiver: spark.user._id, type: 'gift', title: 'New Spark gift', body: `${req.body.giftName} • ${cost} coins`, link: `/spark/${spark._id}` }).catch(() => null);
-        req.app.get("io")?.to(String(spark.user._id)).emit('gift:received', { sourceType: 'spark', sourceId: String(spark._id), giftName: req.body.giftName, coins: cost });
+        await createSocialNotification(req, {
+            sender: req.user.id,
+            receiver: spark.user._id,
+            type: "gift",
+            title: "New Spark gift",
+            body: `${req.body.giftName} • ${cost} coins`,
+            link: `/spark/${spark._id}`
+        }).catch(() => null);
+        req.app.get("io")?.to(`user:${String(spark.user._id)}`).emit('gift:received', { sourceType: 'spark', sourceId: String(spark._id), giftName: req.body.giftName, coins: cost });
         return res.json({ success: true, coins: result.coins, gift: { id: result.gift._id, name: result.gift.giftName, coins: result.gift.coins } });
     } catch (err) { return res.status(500).json({ success: false, message: err.message }); }
 };

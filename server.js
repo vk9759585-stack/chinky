@@ -127,6 +127,7 @@ require("./services/scheduledLiveReminderService").startScheduledLiveReminders()
 app.use(require("./routes/webRoutes"));
 
 // Media
+app.use("/api/moderation", require("./routes/moderationRoutes"));
 app.use("/api/media", require("./routes/mediaRoutes"));
 
 // AUTH

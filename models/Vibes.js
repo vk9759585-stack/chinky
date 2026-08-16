@@ -17,6 +17,12 @@ const storySchema = new mongoose.Schema(
             required: true
         },
 
+        mediaPublicId: {
+            type: String,
+            default: "",
+            index: true
+        },
+
         isVideo: {
             type: Boolean,
             default: false
@@ -28,6 +34,24 @@ const storySchema = new mongoose.Schema(
                 ref: "User"
             }
         ],
+
+
+        moderationStatus: {
+            type: String,
+            enum: ["pending", "approved", "rejected"],
+            default: "approved",
+            index: true
+        },
+
+        moderationKind: {
+            type: String,
+            default: ""
+        },
+
+        moderationCheckedAt: {
+            type: Date,
+            default: null
+        },
 
         caption: {
             type: String,

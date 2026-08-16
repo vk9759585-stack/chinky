@@ -215,11 +215,11 @@ exports.getMyContent = async (req, res) => {
     try {
         const viewerId = req.user.id;
         const [posts, sparks, vibes, taggedPosts, taggedSparks] = await Promise.all([
-            Post.find({ user: viewerId }).populate(contentPopulate).sort({ createdAt: -1 }),
-            Spark.find({ user: viewerId }).populate(contentPopulate).sort({ createdAt: -1 }),
+            Post.find({ user: viewerId, $or: [{ moderationStatus: { $exists: false } }, { moderationStatus: "approved" }] }).populate(contentPopulate).sort({ createdAt: -1 }),
+            Spark.find({ user: viewerId, $or: [{ moderationStatus: { $exists: false } }, { moderationStatus: "approved" }] }).populate(contentPopulate).sort({ createdAt: -1 }),
             Vibes.find({ user: viewerId }).sort({ createdAt: -1 }),
-            Post.find({ taggedUsers: viewerId }).populate(contentPopulate).sort({ createdAt: -1 }),
-            Spark.find({ taggedUsers: viewerId }).populate(contentPopulate).sort({ createdAt: -1 })
+            Post.find({ taggedUsers: viewerId, $or: [{ moderationStatus: { $exists: false } }, { moderationStatus: "approved" }] }).populate(contentPopulate).sort({ createdAt: -1 }),
+            Spark.find({ taggedUsers: viewerId, $or: [{ moderationStatus: { $exists: false } }, { moderationStatus: "approved" }] }).populate(contentPopulate).sort({ createdAt: -1 })
         ]);
 
         return res.json({
@@ -256,10 +256,10 @@ exports.getPublicProfile = async (req, res) => {
 
         if (canView) {
             [posts, sparks, taggedPosts, taggedSparks] = await Promise.all([
-                Post.find({ user: user._id }).populate(contentPopulate).sort({ createdAt: -1 }),
-                Spark.find({ user: user._id }).populate(contentPopulate).sort({ createdAt: -1 }),
-                Post.find({ taggedUsers: user._id }).populate(contentPopulate).sort({ createdAt: -1 }),
-                Spark.find({ taggedUsers: user._id }).populate(contentPopulate).sort({ createdAt: -1 })
+                Post.find({ user: user._id, $or: [{ moderationStatus: { $exists: false } }, { moderationStatus: "approved" }] }).populate(contentPopulate).sort({ createdAt: -1 }),
+                Spark.find({ user: user._id, $or: [{ moderationStatus: { $exists: false } }, { moderationStatus: "approved" }] }).populate(contentPopulate).sort({ createdAt: -1 }),
+                Post.find({ taggedUsers: user._id, $or: [{ moderationStatus: { $exists: false } }, { moderationStatus: "approved" }] }).populate(contentPopulate).sort({ createdAt: -1 }),
+                Spark.find({ taggedUsers: user._id, $or: [{ moderationStatus: { $exists: false } }, { moderationStatus: "approved" }] }).populate(contentPopulate).sort({ createdAt: -1 })
             ]);
 
             taggedPosts = taggedPosts.filter((post) => canSeeOwner(post.user, viewerId));

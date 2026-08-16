@@ -7,6 +7,7 @@ const Notification = require('../models/Notification');
 const LiveBattle = require('../models/LiveBattle');
 const { getGift, splitCoins } = require('../config/monetization');
 const { changeCoins, creditCreatorEarnings, runFinancialTransaction } = require('../services/walletAccountingService');
+const { createSocialNotification } = require("../services/socialNotificationService");
 
 const token04 = (appID, userID, serverSecret, effectiveSeconds, payload = "") => {
   const now = Math.floor(Date.now() / 1000);
@@ -184,8 +185,15 @@ exports.sendGift = async (req, res) => {
       await activeBattle.save();
       req.app.get("io")?.to(`live:${sessionDoc.liveID}`).emit("live:battle-score", activeBattle.toObject());
     }
-    await Notification.create({ sender: req.user.id, receiver: sessionDoc.hostUserId, type: 'gift', title: 'New Live gift', body: `${selectedGift.name} • ${selectedGift.coins} coins`, link: `/live/${sessionDoc.liveID}` }).catch(() => null);
-    req.app.get("io")?.to(String(sessionDoc.hostUserId)).emit('gift:received', { sourceType: 'live', sourceId: sessionDoc.liveID, giftName: selectedGift.name, coins: selectedGift.coins });
+    await createSocialNotification(req, {
+            sender: req.user.id,
+            receiver: sessionDoc.hostUserId,
+            type: "gift",
+            title: "New Live gift",
+            body: `${selectedGift.name} • ${selectedGift.coins} coins`,
+            link: `/live/${sessionDoc.liveID}`
+        }).catch(() => null);
+    req.app.get("io")?.to(`user:${String(sessionDoc.hostUserId)}`).emit('gift:received', { sourceType: 'live', sourceId: sessionDoc.liveID, giftName: selectedGift.name, coins: selectedGift.coins });
     req.app.get("io")?.to(`live:${sessionDoc.liveID}`).emit('live:gift', { giftName: selectedGift.name, coins: selectedGift.coins, senderId: String(req.user.id), effectKey: result.gift.effectKey });
     return res.json({ success: true, coins: result.senderWallet.coins, gift: { id: result.gift._id, name: result.gift.giftName, coins: result.gift.coins, effectKey: result.gift.effectKey } });
   } catch (error) {

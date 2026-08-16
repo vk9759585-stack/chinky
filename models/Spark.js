@@ -10,6 +10,24 @@ const sparkSchema = new mongoose.Schema(
 
         uploadKey: { type: String, default: "", index: true, select: false },
 
+
+        moderationStatus: {
+            type: String,
+            enum: ["pending", "approved", "rejected"],
+            default: "approved",
+            index: true
+        },
+
+        moderationKind: {
+            type: String,
+            default: ""
+        },
+
+        moderationCheckedAt: {
+            type: Date,
+            default: null
+        },
+
         caption: {
             type: String,
             default: ""

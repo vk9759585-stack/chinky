@@ -15,6 +15,12 @@ const postSchema = new mongoose.Schema(
             default: ""
         },
 
+        mediaPublicId: {
+            type: String,
+            default: "",
+            index: true
+        },
+
         thumbnail: {
             type: String,
             default: ""
@@ -24,6 +30,24 @@ const postSchema = new mongoose.Schema(
             type: String,
             enum: ["image", "video"],
             default: "image"
+        },
+
+
+        moderationStatus: {
+            type: String,
+            enum: ["pending", "approved", "rejected"],
+            default: "approved",
+            index: true
+        },
+
+        moderationKind: {
+            type: String,
+            default: ""
+        },
+
+        moderationCheckedAt: {
+            type: Date,
+            default: null
         },
 
         caption: {

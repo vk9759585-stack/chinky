@@ -4,6 +4,22 @@ const Payment = require('../models/Payment');
 const { getCoinPackage, quoteCustomCoins, CUSTOM_COIN_MIN, CUSTOM_COIN_MAX, withPurchaseFee } = require('../config/monetization');
 const { changeCoins, getOrCreateWallet, runFinancialTransaction } = require('../services/walletAccountingService');
 
+const razorpayKeyId = String(process.env.RAZORPAY_KEY || '').trim();
+const razorpaySecret = String(process.env.RAZORPAY_SECRET || '').trim();
+const isLiveRazorpay = Boolean(
+    razorpay &&
+    razorpayKeyId.startsWith('rzp_live_') &&
+    razorpaySecret
+);
+
+const livePaymentUnavailable = (res) => {
+    return res.status(503).json({
+        success: false,
+        code: 'LIVE_PAYMENT_NOT_CONFIGURED',
+        message: 'Live Razorpay payments are not configured. Add Live Mode Razorpay keys before selling coins.',
+    });
+};
+
 const paymentUnavailable = (res) => {
     return res.status(503).json({
         success: false,
@@ -13,12 +29,13 @@ const paymentUnavailable = (res) => {
 
 exports.getCoinCheckoutConfig = (_, res) => res.json({
     success: true,
-    key: process.env.RAZORPAY_KEY || null,
-    enabled: Boolean(razorpay && process.env.RAZORPAY_KEY),
-    upiEnabled: Boolean(razorpay && process.env.RAZORPAY_KEY),
-    cardsEnabled: Boolean(razorpay && process.env.RAZORPAY_KEY),
-    alternativeBillingEnabled: String(process.env.ALTERNATIVE_BILLING_ENABLED || '').toLowerCase() === 'true',
-    checkoutConfigId: process.env.RAZORPAY_CHECKOUT_CONFIG_ID || null,
+    key: isLiveRazorpay ? razorpayKeyId : null,
+    enabled: isLiveRazorpay,
+    liveMode: isLiveRazorpay,
+    paymentMode: isLiveRazorpay ? 'live' : 'disabled',
+    upiEnabled: isLiveRazorpay,
+    cardsEnabled: isLiveRazorpay,
+    netbankingEnabled: isLiveRazorpay,
     customCoinMin: CUSTOM_COIN_MIN,
     customCoinMax: CUSTOM_COIN_MAX,
     purchaseCoinsPer10Rupees: require('../config/monetization').PURCHASE_COINS_PER_10_RUPEES,
@@ -32,7 +49,7 @@ exports.quoteCustomCoinPurchase = (req, res) => {
 };
 
 exports.createCoinOrder = async (req, res) => {
-    if (!razorpay) return paymentUnavailable(res);
+    if (!isLiveRazorpay) return livePaymentUnavailable(res);
     try {
         const requestedPackageId = String(req.body.packageId || '');
         const customCoins = req.body.customCoins;
@@ -71,6 +88,7 @@ exports.createCoinOrder = async (req, res) => {
                 currency: 'INR',
                 packageId: coinPackage.id,
                 coins: coinPackage.coins,
+                liveMode: true,
             },
         });
     } catch (err) {
@@ -79,8 +97,8 @@ exports.createCoinOrder = async (req, res) => {
 };
 
 exports.verifyCoinPayment = async (req, res) => {
-    const secret = process.env.RAZORPAY_SECRET;
-    if (!razorpay || !secret) return paymentUnavailable(res);
+    const secret = razorpaySecret;
+    if (!isLiveRazorpay) return livePaymentUnavailable(res);
 
     const { orderId, paymentId, signature } = req.body;
     if (![orderId, paymentId, signature].every((value) => typeof value === 'string' && value.trim())) {
@@ -113,7 +131,16 @@ exports.verifyCoinPayment = async (req, res) => {
             gatewayPayment = await razorpay.payments.capture(paymentId, paymentRecord.amount, 'INR');
         }
         if (gatewayPayment.status !== 'captured') {
-            return res.status(409).json({ success: false, message: 'Payment has not been captured yet.' });
+            return res.status(409).json({
+                success: false,
+                message: 'Payment has not been captured. No coins were added.'
+            });
+        }
+        if (!gatewayPayment.method) {
+            return res.status(400).json({
+                success: false,
+                message: 'Payment method could not be verified. No coins were added.'
+            });
         }
 
         const wallet = await runFinancialTransaction(async (session) => {
@@ -137,7 +164,14 @@ exports.verifyCoinPayment = async (req, res) => {
                 session,
             });
         });
-        return res.json({ success: true, data: wallet });
+        return res.json({
+            success: true,
+            paymentVerified: true,
+            orderId,
+            paymentId,
+            creditedCoins: paymentRecord.coins,
+            data: wallet
+        });
     } catch (err) {
         return res.status(400).json({ success: false, message: err.message || 'Coin payment could not be verified.' });
     }
@@ -192,60 +226,12 @@ exports.recoverCoinPayment = async (req, res) => {
 // GOOGLE PLAY / APP STORE COIN PURCHASE
 // ======================================
 exports.verifyStoreCoinPurchase = async (req, res) => {
-    const { platform, productId, purchaseId, verificationData } = req.body || {};
-    if (!['android', 'ios'].includes(platform) || !productId) {
-        return res.status(400).json({ success: false, message: 'Valid store platform and product id are required.' });
-    }
-    const { COIN_PACKAGES } = require('../config/monetization');
-    const coinPackage = COIN_PACKAGES.find((item) =>
-        (platform === 'android' ? item.androidProductId : item.iosProductId) === productId
-    );
-    if (!coinPackage) return res.status(400).json({ success: false, message: 'Unknown coin store product.' });
-
-    try {
-        const { verifyStorePurchase } = require('../services/storePurchaseVerificationService');
-        const verified = await verifyStorePurchase({ platform, productId, purchaseId, verificationData });
-        const StorePurchase = require('../models/StorePurchase');
-
-        const wallet = await runFinancialTransaction(async (session) => {
-            const duplicateQuery = verified.purchaseToken
-                ? { platform, purchaseToken: verified.purchaseToken }
-                : { platform, transactionId: verified.transactionId };
-            const existing = await StorePurchase.findOne(duplicateQuery).session(session);
-            if (existing) {
-                if (String(existing.user) !== String(req.user.id)) throw new Error('This store purchase was already used by another account.');
-                return getOrCreateWallet(req.user.id, session);
-            }
-
-            const record = await StorePurchase.create([{
-                user: req.user.id,
-                platform,
-                productId,
-                packageId: coinPackage.id,
-                coins: coinPackage.coins,
-                transactionId: verified.transactionId || undefined,
-                purchaseToken: verified.purchaseToken || undefined,
-                status: 'verified',
-                storePayload: verified.payload,
-                processedAt: new Date(),
-            }], { session });
-
-            return changeCoins({
-                user: req.user.id,
-                delta: coinPackage.coins,
-                transactionType: 'coin_purchase',
-                referenceType: 'store_purchase',
-                referenceId: record[0]._id,
-                metadata: { platform, productId, packageId: coinPackage.id, transactionId: verified.transactionId },
-                session,
-            });
-        });
-        return res.json({ success: true, data: wallet });
-    } catch (err) {
-        console.error('Store coin verification failed:', err?.response?.data || err.message);
-        return res.status(400).json({ success: false, message: err.message || 'Store purchase could not be verified.' });
-    }
+    return res.status(410).json({
+        success: false,
+        message: 'Store coin purchases are disabled. Use Razorpay live checkout.'
+    });
 };
+
 
 // ======================================
 // CREATE ORDER
@@ -284,22 +270,17 @@ exports.createOrder = async (req, res) => {
     }
 };
 
-exports.createUpiCoinRequest = async (req,res)=>{
-  try{
-    const upiId=String(req.body.upiId||'').trim().toLowerCase();
-    const coinPackage=getCoinPackage(String(req.body.packageId||''));
-    if(!coinPackage) return res.status(400).json({success:false,message:'Invalid coin package.'});
-    if(!/^[a-z0-9._-]{2,}@[a-z0-9.-]{2,}$/i.test(upiId)) return res.status(400).json({success:false,message:'Enter a valid UPI ID.'});
-    const UpiCoinRequest=require('../models/UpiCoinRequest');
-    const existing=await UpiCoinRequest.findOne({user:req.user.id,status:'pending'});
-    if(existing) return res.status(409).json({success:false,message:'Your previous UPI purchase request is still pending.'});
-    const pricedPackage=withPurchaseFee(coinPackage);
-    const row=await UpiCoinRequest.create({user:req.user.id,packageId:pricedPackage.id,upiId,baseAmountPaise:pricedPackage.baseAmountPaise,serviceFeePaise:pricedPackage.serviceFeePaise,amountPaise:pricedPackage.totalAmountPaise,coins:pricedPackage.coins});
-    return res.status(201).json({success:true,message:'UPI purchase request created.',data:{id:row._id,status:row.status,baseAmountPaise:row.baseAmountPaise,serviceFeePaise:row.serviceFeePaise,amountPaise:row.amountPaise,coins:row.coins}});
-  }catch(e){ console.error('UPI request error:',e); return res.status(500).json({success:false,message:'UPI request could not be created on the server.'}); }
+exports.createUpiCoinRequest = async (req, res) => {
+  return res.status(410).json({
+    success: false,
+    message: 'Manual UPI coin requests are disabled. Use Razorpay live checkout.'
+  });
 };
-exports.getMyUpiCoinRequests = async (req,res)=>{
-  const UpiCoinRequest=require('../models/UpiCoinRequest');
-  const rows=await UpiCoinRequest.find({user:req.user.id}).sort({createdAt:-1}).limit(20).lean();
-  res.json({success:true,data:rows});
+
+exports.getMyUpiCoinRequests = async (req, res) => {
+  return res.status(410).json({
+    success: false,
+    data: [],
+    message: 'Manual UPI requests are disabled.'
+  });
 };

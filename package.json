@@ -13,7 +13,9 @@
     "audio:generate": "node scripts/generate-original-audio.js",
     "check:syntax": "node --check server.js && node --check controllers/webController.js && node --check controllers/audioController.js && node --check controllers/sparkController.js && node --check controllers/vibesController.js && node --check controllers/supportController.js && node --check routes/webRoutes.js && node --check routes/supportRoutes.js && node --check data/audioCatalog.js && node --check data/supportKnowledgeBase.js && node --check services/supportAiService.js && node --check services/supportNotificationService.js && node --check services/supportMonitorService.js && node --check scripts/generate-original-audio.js && node --check smoke-tests/verify-support-ai.js && node --check smoke-tests/verify-audio-library.js && node --check website/app.js && node --check smoke-tests/verify-website.js",
     "smoke:health": "node smoke-tests/run-newman.js --folder Health",
-    "smoke:full": "node smoke-tests/run-newman.js"
+    "smoke:full": "node smoke-tests/run-newman.js",
+    "moderation:env": "node scripts/print-moderation-env.js",
+    "check:moderation": "node --check services/contentModerationService.js && node --check controllers/moderationController.js && node --check routes/moderationRoutes.js && node --check scripts/print-moderation-env.js"
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",
