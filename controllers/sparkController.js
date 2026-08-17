@@ -151,7 +151,6 @@ exports.createSpark = async (req, res) => {
         }
 
         const edit = editFromBody(req.body.edit, req.body.filter || "Original");
-        const qualityWidth = edit.exportQuality === "1080P" ? 1080 : edit.exportQuality === "480P" ? 480 : 720;
         let videoUrl = "";
         let videoPublicId = "";
         let thumbnail = (req.body.thumbnail || "").trim();
@@ -160,7 +159,10 @@ exports.createSpark = async (req, res) => {
             const upload = await cloudinary.uploader.upload(videoFile.path, {
                 resource_type: "video",
                 folder: "chinky/sparks",
-                transformation: [{ width: qualityWidth, crop: "limit" }],
+                // Store the uploaded video first. A synchronous resize here
+                // made the mobile request sit at 99% while Cloudinary encoded
+                // the video. Delivery can still use Cloudinary transformations
+                // without blocking publish.
                 ...moderationUploadOptions("video")
             });
             if (moderationRejected(upload)) {
