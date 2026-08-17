@@ -1,34 +1,80 @@
 const mongoose = require('mongoose');
 const Wallet = require('../models/Wallet');
 const WalletLedger = require('../models/WalletLedger');
+const {
+  CREATOR_COIN_MINOR_PER_REFERENCE_PACK,
+  MINTS_PER_REFERENCE_PACK,
+} = require('../config/monetization');
 
 const emptyWallet = (user) => ({ user, coins: 0, balance: 0, purchasedCoins: 0, rewardCoins: 0, earnedCoins: 0, earnedCoinMinor: 0 });
 
 async function getOrCreateWallet(user, session) {
   const options = { new: true, upsert: true, setDefaultsOnInsert: true };
   if (session) options.session = session;
-  return Wallet.findOneAndUpdate({ user }, { $setOnInsert: emptyWallet(user) }, options);
+  const wallet = await Wallet.findOneAndUpdate(
+    { user },
+    { $setOnInsert: emptyWallet(user) },
+    options
+  );
+
+  const before = JSON.stringify({
+    coins: wallet.coins,
+    purchasedCoins: wallet.purchasedCoins,
+    rewardCoins: wallet.rewardCoins,
+    earnedCoins: wallet.earnedCoins,
+    earnedCoinMinor: wallet.earnedCoinMinor,
+  });
+  normalizeBuckets(wallet);
+  const after = JSON.stringify({
+    coins: wallet.coins,
+    purchasedCoins: wallet.purchasedCoins,
+    rewardCoins: wallet.rewardCoins,
+    earnedCoins: wallet.earnedCoins,
+    earnedCoinMinor: wallet.earnedCoinMinor,
+  });
+  if (before !== after) {
+    await wallet.save(session ? { session } : undefined);
+  }
+  return wallet;
 }
 
 function normalizeBuckets(wallet) {
   wallet.purchasedCoins = Math.max(0, Math.floor(Number(wallet.purchasedCoins || 0)));
   wallet.rewardCoins = Math.max(0, Math.floor(Number(wallet.rewardCoins || 0)));
-  wallet.earnedCoins = Math.max(0, Number(wallet.earnedCoins || 0)); // legacy Diamonds/Coins only.
-  wallet.earnedCoinMinor = Math.max(0, Math.floor(Number(wallet.earnedCoinMinor || 0)));
 
-  // Value-preserving migration from the old ₹1-per-Diamond system:
-  // 1 old earned unit (₹1) => 2 new Coins => 200 minor.
-  if (wallet.earnedCoinMinor === 0 && wallet.earnedCoins > 0) {
-    wallet.earnedCoinMinor = Math.round(wallet.earnedCoins * 200);
+  // Old builds stored creator earnings in `earnedCoins` and also included that
+  // amount inside the legacy total `coins`. Preserve the old rupee value once,
+  // but never duplicate it into reward Mints.
+  const oldEarned = Math.max(0, Number(wallet.earnedCoins || 0));
+  wallet.earnedCoinMinor = Math.max(0, Math.floor(Number(wallet.earnedCoinMinor || 0)));
+  wallet.creatorConversionRemainder = Math.max(
+    0,
+    Math.min(
+      MINTS_PER_REFERENCE_PACK - 1,
+      Math.floor(Number(wallet.creatorConversionRemainder || 0))
+    )
+  );
+  wallet.totalCreatorCoinMinor = Math.max(
+    0,
+    Math.floor(Number(wallet.totalCreatorCoinMinor || 0))
+  );
+  const legacyTotal = Math.max(0, Math.floor(Number(wallet.coins || 0)));
+
+  let legacyMintTotal = legacyTotal;
+  if (wallet.earnedCoinMinor === 0 && oldEarned > 0) {
+    // Old earned unit was ₹1. New Coin is ₹0.50, so 1 old unit = 2.00 Coins.
+    wallet.earnedCoinMinor = Math.round(oldEarned * 200);
+    legacyMintTotal = Math.max(0, legacyTotal - Math.floor(oldEarned));
+    wallet.earnedCoins = 0;
+  } else {
     wallet.earnedCoins = 0;
   }
 
-  // `coins` is now the legacy database field holding total Mints only.
-  const mintBuckets = wallet.purchasedCoins + wallet.rewardCoins;
-  const legacyTotal = Math.max(0, Math.floor(Number(wallet.coins || 0)));
-  if (mintBuckets < legacyTotal) {
-    wallet.rewardCoins += (legacyTotal - mintBuckets);
+  const knownMints = wallet.purchasedCoins + wallet.rewardCoins;
+  if (knownMints < legacyMintTotal) {
+    wallet.rewardCoins += (legacyMintTotal - knownMints);
   }
+
   wallet.coins = wallet.purchasedCoins + wallet.rewardCoins;
 }
 
@@ -102,6 +148,61 @@ async function creditRewardCoins({ user, coins, transactionType, referenceType, 
   return wallet;
 }
 
+async function creditCreatorGiftEarnings({
+  user,
+  mints,
+  transactionType,
+  referenceType,
+  referenceId,
+  metadata = {},
+  session
+}) {
+  if (!Number.isInteger(mints) || mints <= 0) {
+    throw new Error('Gift Mint amount must be a positive integer');
+  }
+
+  const wallet = await getOrCreateWallet(user, session);
+  normalizeBuckets(wallet);
+
+  const numerator =
+    (mints * CREATOR_COIN_MINOR_PER_REFERENCE_PACK) +
+    wallet.creatorConversionRemainder;
+  const amountMinor = Math.floor(numerator / MINTS_PER_REFERENCE_PACK);
+  wallet.creatorConversionRemainder = numerator % MINTS_PER_REFERENCE_PACK;
+
+  if (amountMinor <= 0) {
+    throw new Error('Gift is too small to credit creator Coins');
+  }
+
+  wallet.earnedCoinMinor += amountMinor;
+  wallet.totalCreatorCoinMinor += amountMinor;
+  wallet.totalEarned = Number(wallet.totalEarned || 0) + (amountMinor / 100);
+  await wallet.save({ session });
+
+  await ledger({
+    user,
+    transactionType,
+    coinDelta: 0,
+    before: Number(wallet.coins || 0),
+    after: Number(wallet.coins || 0),
+    referenceType,
+    referenceId,
+    metadata: {
+      ...metadata,
+      giftMints: mints,
+      earnedCoinMinorDelta: amountMinor,
+      conversionRemainder: wallet.creatorConversionRemainder,
+    },
+    session
+  });
+
+  return {
+    wallet,
+    creditedCoinMinor: amountMinor,
+    conversionRemainder: wallet.creatorConversionRemainder,
+  };
+}
+
 async function creditCreatorEarnings({ user, coinMinor, coins, transactionType, referenceType, referenceId, metadata = {}, session }) {
   const amountMinor = Number.isInteger(coinMinor) ? coinMinor : Number.isInteger(coins) ? coins : 0;
   if (!Number.isInteger(amountMinor) || amountMinor <= 0) {
@@ -110,6 +211,8 @@ async function creditCreatorEarnings({ user, coinMinor, coins, transactionType, 
   const wallet = await getOrCreateWallet(user, session);
   normalizeBuckets(wallet);
   wallet.earnedCoinMinor += amountMinor;
+  wallet.totalCreatorCoinMinor =
+      Math.max(0, Number(wallet.totalCreatorCoinMinor || 0)) + amountMinor;
   wallet.totalEarned = Number(wallet.totalEarned || 0) + (amountMinor / 100);
   await wallet.save({ session });
   await ledger({
@@ -159,4 +262,4 @@ async function runFinancialTransaction(work) {
   } finally { await session.endSession(); }
 }
 
-module.exports = { getOrCreateWallet, changeCoins, creditRewardCoins, creditCreatorEarnings, debitEarnedCoins, runFinancialTransaction };
+module.exports = { getOrCreateWallet, changeCoins, creditRewardCoins, creditCreatorEarnings, creditCreatorGiftEarnings, debitEarnedCoins, runFinancialTransaction };

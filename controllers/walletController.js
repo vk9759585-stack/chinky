@@ -45,6 +45,7 @@ exports.getReceivedGifts = async (req, res) => {
           $group: {
             _id: null,
             totalCoins: { $sum: "$coins" },
+            totalCreatorCoinMinor: { $sum: "$creatorCoinMinor" },
             totalGiftEvents: { $sum: 1 }
           }
         }
@@ -56,6 +57,7 @@ exports.getReceivedGifts = async (req, res) => {
             _id: "$sender",
             giftCount: { $sum: 1 },
             totalCoins: { $sum: "$coins" },
+            totalCreatorCoinMinor: { $sum: "$creatorCoinMinor" },
             lastGiftAt: { $max: "$createdAt" }
           }
         },
@@ -74,6 +76,10 @@ exports.getReceivedGifts = async (req, res) => {
     ]);
 
     const totalCoins = totals[0]?.totalCoins || 0;
+    const storedCreatorMinor = Number(totals[0]?.totalCreatorCoinMinor || 0);
+    const totalCreatorCoinMinor = storedCreatorMinor > 0
+      ? storedCreatorMinor
+      : mintsToCreatorCoinMinor(totalCoins);
     const totalGiftEvents = totals[0]?.totalGiftEvents || count;
 
     return res.json({
@@ -83,6 +89,8 @@ exports.getReceivedGifts = async (req, res) => {
         totalGiftEvents,
         totalMints: totalCoins,
         totalCoins: totalCoins,
+        totalCreatorCoinMinor,
+        totalEarnedCoins: totalCreatorCoinMinor / 100,
         topGifters: senderStats.map(row => ({
           senderId: row._id ? String(row._id) : "",
           name: row.sender?.name || "",
@@ -92,8 +100,12 @@ exports.getReceivedGifts = async (req, res) => {
           giftCount: row.giftCount || 0,
           totalMints: row.totalCoins || 0,
           totalCoins: row.totalCoins || 0,
-          earnedCoinMinor: mintsToCreatorCoinMinor(row.totalCoins || 0),
-          earnedCoins: mintsToCreatorCoinMinor(row.totalCoins || 0) / 100,
+          earnedCoinMinor: Number(row.totalCreatorCoinMinor || 0) > 0
+            ? Number(row.totalCreatorCoinMinor)
+            : mintsToCreatorCoinMinor(row.totalCoins || 0),
+          earnedCoins: (Number(row.totalCreatorCoinMinor || 0) > 0
+            ? Number(row.totalCreatorCoinMinor)
+            : mintsToCreatorCoinMinor(row.totalCoins || 0)) / 100,
           lastGiftAt: row.lastGiftAt
         })),
         gifts: rows.map(row => ({
@@ -219,19 +231,39 @@ exports.createWithdrawalRequest = async (req, res) => {
   }
 };
 exports.getWithdrawalRequests = async (req, res) => {
-  const rows = await WithdrawalRequest.find({ user: req.user.id }).sort({ createdAt: -1 }).limit(30).lean();
+  const rows = await WithdrawalRequest.find({ user: req.user.id })
+    .sort({ createdAt: -1 })
+    .limit(30)
+    .lean();
+
   return res.json({
     success: true,
-    data: rows.map(r => ({
-      id: String(r._id),
-      coinMinor: r.coins,
-      coins: Number(r.coins || 0) / 100,
-      grossAmountPaise: r.grossAmountPaise || r.amountPaise,
-      serviceFeePaise: r.serviceFeePaise || 0,
-      amountPaise: r.amountPaise,
-      upiId: r.upiId,
-      status: r.status,
-      createdAt: r.createdAt,
-    })),
+    data: rows.map(r => {
+      const stored = Math.max(0, Number(r.coins || 0));
+      const grossPaise = Math.max(0, Number(r.grossAmountPaise || r.amountPaise || 0));
+
+      // New rows store Coin minor units: 2239 minor => ₹11.20.
+      // Old rows stored whole old earned units. Convert old history by rupee
+      // value so its displayed value remains correct after the currency rename.
+      const looksLikeNewMinor =
+        grossPaise > 0 && Math.abs(grossPaise - Math.round(stored / 2)) <= 1;
+      const coinMinor = looksLikeNewMinor
+        ? Math.round(stored)
+        : grossPaise > 0
+          ? Math.round(grossPaise * 2)
+          : Math.round(stored);
+
+      return {
+        id: String(r._id),
+        coinMinor,
+        coins: coinMinor / 100,
+        grossAmountPaise: grossPaise,
+        serviceFeePaise: r.serviceFeePaise || 0,
+        amountPaise: r.amountPaise,
+        upiId: r.upiId,
+        status: r.status,
+        createdAt: r.createdAt,
+      };
+    }),
   });
 };

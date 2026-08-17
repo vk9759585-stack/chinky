@@ -1,7 +1,16 @@
 const Razorpay = require("razorpay");
 
-const keyId = process.env.RAZORPAY_KEY?.trim();
-const keySecret = process.env.RAZORPAY_SECRET?.trim();
+const keyId = String(
+  process.env.RAZORPAY_KEY ||
+  process.env.RAZORPAY_KEY_ID ||
+  ''
+).trim();
+
+const keySecret = String(
+  process.env.RAZORPAY_SECRET ||
+  process.env.RAZORPAY_KEY_SECRET ||
+  ''
+).trim();
 
 if (!keyId || !keySecret) {
   if (process.env.NODE_ENV !== "production") {

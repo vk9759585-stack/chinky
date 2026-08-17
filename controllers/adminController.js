@@ -230,27 +230,18 @@ exports.updateWithdrawalStatus = async (req, res) => {
 // ===================================
 // MANUAL UPI COIN REQUESTS
 // ===================================
-exports.getUpiCoinRequests = async (req,res)=>{
-  const UpiCoinRequest=require('../models/UpiCoinRequest');
-  const rows=await UpiCoinRequest.find({status:req.query.status||'pending'}).populate('user','username email').sort({createdAt:-1}).limit(100).lean();
-  res.json({success:true,data:rows});
+exports.getUpiCoinRequests = async (_req, res) => {
+  return res.status(410).json({
+    success: false,
+    data: [],
+    message: 'Manual UPI Mint requests are disabled. Use verified Razorpay checkout.'
+  });
 };
-exports.reviewUpiCoinRequest = async (req,res)=>{
-  try{
-    const UpiCoinRequest=require('../models/UpiCoinRequest');
-    const {runFinancialTransaction,changeCoins}=require('../services/walletAccountingService');
-    const decision=String(req.body.decision||'').toLowerCase();
-    if(!['approved','rejected'].includes(decision))return res.status(400).json({success:false,message:'Decision must be approved or rejected.'});
-    const row=await runFinancialTransaction(async(session)=>{
-      const request=await UpiCoinRequest.findById(req.params.id).session(session);
-      if(!request)throw new Error('Request not found');
-      if(request.status!=='pending')return request;
-      request.status=decision;request.reviewedBy=req.user.id;request.reviewedAt=new Date();await request.save({session});
-      if(decision==='approved')await changeCoins({user:request.user,delta:request.coins,transactionType:'coin_purchase',referenceType:'upi_request',referenceId:request._id,metadata:{packageId:request.packageId,amountPaise:request.amountPaise,upiId:request.upiId},session});
-      return request;
-    });
-    res.json({success:true,data:row});
-  }catch(e){res.status(400).json({success:false,message:e.message});}
+exports.reviewUpiCoinRequest = async (_req, res) => {
+  return res.status(410).json({
+    success: false,
+    message: 'Manual UPI Mint requests are disabled.'
+  });
 };
 
 // ===================================

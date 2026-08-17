@@ -30,6 +30,14 @@ const walletSchema = new mongoose.Schema(
         // Creator Coins in hundredths. Example: 22.39 Coins => 2239.
         earnedCoinMinor: { type: Number, default: 0, min: 0 },
 
+        // Remainder for exact cumulative Mint -> creator Coin conversion.
+        // Denominator is 90; keeps 90 Mints = 22.39 Coins regardless of
+        // how those 90 Mints are split across multiple gifts.
+        creatorConversionRemainder: { type: Number, default: 0, min: 0, max: 89 },
+
+        totalCreatorCoinMinor: { type: Number, default: 0, min: 0 },
+
+
 
         totalCoinsPurchased: { type: Number, default: 0, min: 0 },
 

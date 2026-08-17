@@ -5,8 +5,8 @@ const User = require('../models/User');
 const Gift = require('../models/Gift');
 const Notification = require('../models/Notification');
 const LiveBattle = require('../models/LiveBattle');
-const { getGift, splitCoins } = require('../config/monetization');
-const { changeCoins, creditCreatorEarnings, runFinancialTransaction } = require('../services/walletAccountingService');
+const { getGift } = require('../config/monetization');
+const { changeCoins, creditCreatorGiftEarnings, runFinancialTransaction } = require('../services/walletAccountingService');
 const { createSocialNotification } = require("../services/socialNotificationService");
 
 const token04 = (appID, userID, serverSecret, effectiveSeconds, payload = "") => {
@@ -144,7 +144,6 @@ exports.sendGift = async (req, res) => {
     if (String(sessionDoc.hostUserId) === String(req.user.id)) return res.status(400).json({ success: false, message: 'You cannot gift yourself.' });
     const selectedGift = getGift(req.body.giftName);
     if (!selectedGift) return res.status(400).json({ success: false, message: 'Invalid gift' });
-    const { creatorCoinMinor, platformMints } = splitCoins(selectedGift.coins);
     const result = await runFinancialTransaction(async (dbSession) => {
       const created = await Gift.create([{
         sender: req.user.id,
@@ -154,8 +153,8 @@ exports.sendGift = async (req, res) => {
         sourceType: 'live',
         sourceId: sessionDoc.liveID,
         creatorShareCoins: 0,
-                creatorCoinMinor,
-                platformShareMints: platformMints,
+        creatorCoinMinor: 0,
+        platformShareMints: selectedGift.coins,
         platformShareCoins: 0,
         effectKey: selectedGift.coins >= 1000 ? 'fullscreen' : selectedGift.coins >= 250 ? 'burst' : 'pop',
       }], { session: dbSession });
@@ -169,16 +168,22 @@ exports.sendGift = async (req, res) => {
         metadata: { liveID: sessionDoc.liveID, giftName: selectedGift.name },
         session: dbSession,
       });
-      await creditCreatorEarnings({
+      const creatorCredit = await creditCreatorGiftEarnings({
         user: sessionDoc.hostUserId,
-        coinMinor: creatorCoinMinor,
+        mints: selectedGift.coins,
         transactionType: 'live_gift_received',
         referenceType: 'gift',
         referenceId: gift._id,
         metadata: { liveID: sessionDoc.liveID, giftName: selectedGift.name },
         session: dbSession,
       });
-      return { senderWallet, gift };
+      gift.creatorCoinMinor = creatorCredit.creditedCoinMinor;
+      await gift.save({ session: dbSession });
+      return {
+        senderWallet,
+        gift,
+        creatorCoinMinor: creatorCredit.creditedCoinMinor,
+      };
     });
     const activeBattle = await LiveBattle.findOne({ liveID: sessionDoc.liveID, status: "active" });
     if (activeBattle) {

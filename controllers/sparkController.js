@@ -14,8 +14,8 @@ const Gift = require("../models/Gift");
 const Notification = require("../models/Notification");
 const Audio = require("../models/Audio");
 const { createSocialNotification } = require("../services/socialNotificationService");
-const { SPARK_GIFT_MIN_FOLLOWERS, splitCoins, getGift } = require('../config/monetization');
-const { changeCoins, creditCreatorEarnings, runFinancialTransaction } = require('../services/walletAccountingService');
+const { SPARK_GIFT_MIN_FOLLOWERS, getGift } = require('../config/monetization');
+const { changeCoins, creditCreatorGiftEarnings, runFinancialTransaction } = require('../services/walletAccountingService');
 
 const sparkThumbnail = (upload) => {
     if (!upload || !upload.public_id) return "";
@@ -520,7 +520,6 @@ exports.sendGift = async (req, res) => {
         const spark = await Spark.findById(req.params.id).populate("user", "followers");
         if (!spark) return res.status(404).json({ success: false, message: "Spark not found" });
         if (spark.user._id.toString() === req.user.id) return res.status(400).json({ success: false, message: "You cannot send a gift to yourself" });
-        const { creatorCoinMinor, platformMints } = splitCoins(cost);
         const result = await runFinancialTransaction(async (session) => {
             const gift = await Gift.create([{
                 sender: req.user.id,
@@ -530,8 +529,8 @@ exports.sendGift = async (req, res) => {
                 sourceType: 'spark',
                 sourceId: spark._id.toString(),
                 creatorShareCoins: 0,
-                creatorCoinMinor,
-                platformShareMints: platformMints,
+                creatorCoinMinor: 0,
+                platformShareMints: cost,
                 platformShareCoins: 0,
             }], { session });
             const referenceId = gift[0]._id.toString();
@@ -539,11 +538,25 @@ exports.sendGift = async (req, res) => {
                 user: req.user.id, delta: -cost, transactionType: 'spark_gift_sent',
                 referenceType: 'gift', referenceId, metadata: { sparkId: spark._id.toString(), giftName: req.body.giftName }, session,
             });
-            await creditCreatorEarnings({
-                user: spark.user._id, coinMinor: creatorCoinMinor, transactionType: 'spark_gift_received',
-                referenceType: 'gift', referenceId, metadata: { sparkId: spark._id.toString(), giftName: req.body.giftName }, session,
+            const creatorCredit = await creditCreatorGiftEarnings({
+                user: spark.user._id,
+                mints: cost,
+                transactionType: 'spark_gift_received',
+                referenceType: 'gift',
+                referenceId,
+                metadata: {
+                    sparkId: spark._id.toString(),
+                    giftName: req.body.giftName
+                },
+                session,
             });
-            return { gift: gift[0], mints: senderWallet.coins };
+            gift[0].creatorCoinMinor = creatorCredit.creditedCoinMinor;
+            await gift[0].save({ session });
+            return {
+                gift: gift[0],
+                mints: senderWallet.coins,
+                creatorCoinMinor: creatorCredit.creditedCoinMinor,
+            };
         });
         await createSocialNotification(req, {
             sender: req.user.id,

@@ -4,8 +4,16 @@ const Payment = require('../models/Payment');
 const { getCoinPackage, quoteCustomCoins, CUSTOM_COIN_MIN, CUSTOM_COIN_MAX, withPurchaseFee } = require('../config/monetization');
 const { changeCoins, getOrCreateWallet, runFinancialTransaction } = require('../services/walletAccountingService');
 
-const razorpayKeyId = String(process.env.RAZORPAY_KEY || '').trim();
-const razorpaySecret = String(process.env.RAZORPAY_SECRET || '').trim();
+const razorpayKeyId = String(
+    process.env.RAZORPAY_KEY ||
+    process.env.RAZORPAY_KEY_ID ||
+    ''
+).trim();
+const razorpaySecret = String(
+    process.env.RAZORPAY_SECRET ||
+    process.env.RAZORPAY_KEY_SECRET ||
+    ''
+).trim();
 const isLiveRazorpay = Boolean(
     razorpay &&
     razorpayKeyId.startsWith('rzp_live_') &&
@@ -135,13 +143,13 @@ exports.verifyCoinPayment = async (req, res) => {
         if (gatewayPayment.status !== 'captured') {
             return res.status(409).json({
                 success: false,
-                message: 'Payment has not been captured. No coins were added.'
+                message: 'Payment has not been captured. No Mints were added.'
             });
         }
         if (!gatewayPayment.method) {
             return res.status(400).json({
                 success: false,
-                message: 'Payment method could not be verified. No coins were added.'
+                message: 'Payment method could not be verified. No Mints were added.'
             });
         }
 
