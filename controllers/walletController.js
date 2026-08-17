@@ -2,16 +2,21 @@ const Wallet = require('../models/Wallet');
 const WalletLedger = require('../models/WalletLedger');
 const WithdrawalRequest = require('../models/WithdrawalRequest');
 const Gift = require('../models/Gift');
-const { COIN_PACKAGES, GIFT_CATALOG, PURCHASE_COINS_PER_10_RUPEES, WITHDRAW_DIAMONDS_PER_10_RUPEES, MINIMUM_PURCHASE_PAISE, MINIMUM_WITHDRAWAL_COINS, withPurchaseFee, withdrawalFeePaise } = require('../config/monetization');
+const { COIN_PACKAGES, GIFT_CATALOG, MINIMUM_PURCHASE_PAISE, MINIMUM_WITHDRAWAL_COIN_MINOR, withPurchaseFee, withdrawalFeePaise, coinMinorToPaise, mintsToCreatorCoinMinor } = require('../config/monetization');
 const { getOrCreateWallet, debitEarnedCoins, runFinancialTransaction } = require('../services/walletAccountingService');
 
 exports.getWallet = async (req, res) => {
   try {
     const wallet = await getOrCreateWallet(req.user.id);
     const data = wallet.toObject ? wallet.toObject() : wallet;
-    data.giftableCoins = Number(data.purchasedCoins || 0);
-    data.freeRewardCoins = Number(data.rewardCoins || 0);
-    data.withdrawableDiamonds = Number(data.earnedCoins || 0);
+    const earnedMinor = Number(data.earnedCoinMinor || 0) || Math.round(Number(data.earnedCoins || 0) * 200);
+    data.mints = Number(data.coins || 0);
+    data.purchasedMints = Number(data.purchasedCoins || 0);
+    data.rewardMints = Number(data.rewardCoins || 0);
+    data.giftableMints = Number(data.purchasedCoins || 0);
+    data.earnedCoinMinor = earnedMinor;
+    data.earnedCoinsDisplay = (earnedMinor / 100).toFixed(2);
+    data.withdrawableCoins = earnedMinor / 100;
     return res.json({ success: true, data });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });
@@ -76,7 +81,8 @@ exports.getReceivedGifts = async (req, res) => {
       data: {
         count,
         totalGiftEvents,
-        totalCoins,
+        totalMints: totalCoins,
+        totalCoins: totalCoins,
         topGifters: senderStats.map(row => ({
           senderId: row._id ? String(row._id) : "",
           name: row.sender?.name || "",
@@ -84,15 +90,22 @@ exports.getReceivedGifts = async (req, res) => {
           profileImage: row.sender?.profileImage || "",
           verified: row.sender?.verified === true,
           giftCount: row.giftCount || 0,
+          totalMints: row.totalCoins || 0,
           totalCoins: row.totalCoins || 0,
+          earnedCoinMinor: mintsToCreatorCoinMinor(row.totalCoins || 0),
+          earnedCoins: mintsToCreatorCoinMinor(row.totalCoins || 0) / 100,
           lastGiftAt: row.lastGiftAt
         })),
         gifts: rows.map(row => ({
           id: String(row._id),
           giftName: row.giftName,
           quantity: 1,
+          mints: row.coins || 0,
           coins: row.coins || 0,
+          totalMints: row.coins || 0,
           totalCoins: row.coins || 0,
+          creatorCoinMinor: Number(row.creatorCoinMinor || 0) || mintsToCreatorCoinMinor(row.coins || 0),
+          creatorCoins: (Number(row.creatorCoinMinor || 0) || mintsToCreatorCoinMinor(row.coins || 0)) / 100,
           sourceType: row.sourceType,
           sourceId: row.sourceId,
           createdAt: row.createdAt,
@@ -114,22 +127,49 @@ exports.getReceivedGifts = async (req, res) => {
   }
 };
 
-exports.getGiftCatalog = (_, res) => res.json({ success: true, data: { purchaseCoinsPer10Rupees: 0, withdrawDiamondsPer10Rupees: WITHDRAW_DIAMONDS_PER_10_RUPEES, gifts: GIFT_CATALOG } });
-exports.getMonetizationConfig = (_, res) => res.json({ success: true, data: { purchaseCoinsPer10Rupees: 0, withdrawDiamondsPer10Rupees: WITHDRAW_DIAMONDS_PER_10_RUPEES, minimumPurchasePaise: MINIMUM_PURCHASE_PAISE, minimumWithdrawalDiamonds: MINIMUM_WITHDRAWAL_COINS, showCommissionPercentage: false } });
+exports.getGiftCatalog = (_, res) => res.json({
+  success: true,
+  data: {
+    currencyName: 'Mints',
+    earnedCurrencyName: 'Coins',
+    mintsPerReferencePack: 90,
+    creatorCoinMinorPerReferencePack: 2239,
+    coinsPerReferencePack: 22.39,
+    rupeesPerReferenceCoinValue: 11.20,
+    gifts: GIFT_CATALOG.map(g => ({ ...g, mints: g.coins }))
+  }
+});
+exports.getMonetizationConfig = (_, res) => res.json({
+  success: true,
+  data: {
+    currencyName: 'Mints',
+    earnedCurrencyName: 'Coins',
+    minimumPurchasePaise: MINIMUM_PURCHASE_PAISE,
+    minimumWithdrawalCoinMinor: MINIMUM_WITHDRAWAL_COIN_MINOR,
+    minimumWithdrawalCoins: MINIMUM_WITHDRAWAL_COIN_MINOR / 100,
+    coinMinorPerCoin: 100,
+    coinValuePaisePerCoin: 50,
+    reference: { rupees: 29, mints: 90, coins: 22.39, coinValueRupees: 11.20 },
+    showCommissionPercentage: false
+  }
+});
 exports.getActivity = async (req, res) => { try { const rows = await WalletLedger.find({ user: req.user.id }).sort({ createdAt: -1 }).limit(30).lean(); return res.json({ success: true, data: rows.map(x => ({ id: String(x._id), type: x.transactionType, coinDelta: x.coinDelta || 0, earningDeltaPaise: x.earningDeltaPaise || 0, createdAt: x.createdAt, metadata: x.metadata || {} })) }); } catch (_) { return res.status(500).json({ success: false, message: 'Wallet activity could not be loaded.' }); } };
 exports.createWithdrawalRequest = async (req, res) => {
-  const coins = Math.floor(Number(req.body.coins || 0));
+  const rawCoins = Number(req.body.coins ?? req.body.amountCoins ?? 0);
+  const coinMinor = Math.round(rawCoins * 100);
   const upiId = String(req.body.upiId || '').trim().toLowerCase();
-  if (coins < MINIMUM_WITHDRAWAL_COINS) {
-    return res.status(400).json({ success: false, message: `Minimum withdrawal is ${MINIMUM_WITHDRAWAL_COINS} earned coins.` });
+
+  if (!Number.isFinite(rawCoins) || coinMinor < MINIMUM_WITHDRAWAL_COIN_MINOR) {
+    return res.status(400).json({
+      success: false,
+      message: `Minimum withdrawal is ${(MINIMUM_WITHDRAWAL_COIN_MINOR / 100).toFixed(2)} Coins.`
+    });
   }
   if (!/^[a-z0-9._-]{2,}@[a-z0-9.-]{2,}$/i.test(upiId)) {
     return res.status(400).json({ success: false, message: 'Enter a valid UPI ID.' });
   }
 
-  const blocks = Math.floor(coins / WITHDRAW_DIAMONDS_PER_10_RUPEES);
-  const debitCoins = blocks * WITHDRAW_DIAMONDS_PER_10_RUPEES;
-  const grossAmountPaise = blocks * 1000;
+  const grossAmountPaise = coinMinorToPaise(coinMinor);
   const serviceFeePaise = withdrawalFeePaise(grossAmountPaise);
   const netAmountPaise = Math.max(0, grossAmountPaise - serviceFeePaise);
 
@@ -142,7 +182,7 @@ exports.createWithdrawalRequest = async (req, res) => {
     const out = await runFinancialTransaction(async session => {
       const rows = await WithdrawalRequest.create([{
         user: req.user.id,
-        coins: debitCoins,
+        coins: coinMinor,
         grossAmountPaise,
         serviceFeePaise,
         amountPaise: netAmountPaise,
@@ -151,11 +191,11 @@ exports.createWithdrawalRequest = async (req, res) => {
 
       const wallet = await debitEarnedCoins({
         user: req.user.id,
-        coins: debitCoins,
+        coinMinor,
         transactionType: 'withdrawal_pending',
         referenceType: 'withdrawal',
         referenceId: rows[0]._id,
-        metadata: { upiId, grossAmountPaise, serviceFeePaise, netAmountPaise },
+        metadata: { upiId, grossAmountPaise, serviceFeePaise, netAmountPaise, coinMinor },
         session,
       });
       return { row: rows[0], wallet };
@@ -166,7 +206,8 @@ exports.createWithdrawalRequest = async (req, res) => {
       data: {
         id: out.row._id,
         status: out.row.status,
-        coins: debitCoins,
+        coinMinor,
+        coins: coinMinor / 100,
         grossAmountPaise,
         serviceFeePaise,
         amountPaise: netAmountPaise,
@@ -183,7 +224,8 @@ exports.getWithdrawalRequests = async (req, res) => {
     success: true,
     data: rows.map(r => ({
       id: String(r._id),
-      coins: r.coins,
+      coinMinor: r.coins,
+      coins: Number(r.coins || 0) / 100,
       grossAmountPaise: r.grossAmountPaise || r.amountPaise,
       serviceFeePaise: r.serviceFeePaise || 0,
       amountPaise: r.amountPaise,

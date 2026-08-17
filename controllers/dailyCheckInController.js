@@ -144,7 +144,7 @@ exports.claimAdReward = async (req, res) => {
       success: true,
       reward: result.reward,
       message: result.reward > 0
-        ? `Video completed. +${result.reward} coins added.`
+        ? `Video completed. +${result.reward} Free Mints added.`
         : "Today's ad rewards are already complete.",
       data: makeStatus(result.record, result.wallet.coins, now),
     });
@@ -159,6 +159,6 @@ exports.claimAdReward = async (req, res) => {
 exports.claim = async (_req, res) => {
   return res.status(410).json({
     success: false,
-    message: 'Daily check-in rewards are disabled. Watch rewarded ads to earn 1 Free Coin per completed ad.'
+    message: 'Daily check-in rewards are disabled. Watch rewarded ads to earn 1 Free Mint per completed ad.'
   });
 };

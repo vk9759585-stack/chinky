@@ -16,7 +16,7 @@ const livePaymentUnavailable = (res) => {
     return res.status(503).json({
         success: false,
         code: 'LIVE_PAYMENT_NOT_CONFIGURED',
-        message: 'Live Razorpay payments are not configured. Add Live Mode Razorpay keys before selling coins.',
+        message: 'Live Razorpay payments are not configured. Add Live Mode Razorpay keys before selling Mints.',
     });
 };
 
@@ -76,6 +76,7 @@ exports.createCoinOrder = async (req, res) => {
             purpose: 'coins',
             packageId: coinPackage.id,
             coins: coinPackage.coins,
+                mints: coinPackage.mints ?? coinPackage.coins,
             description: `Chinky Coins: ${coinPackage.id}`,
         });
         return res.status(201).json({
@@ -88,6 +89,7 @@ exports.createCoinOrder = async (req, res) => {
                 currency: 'INR',
                 packageId: coinPackage.id,
                 coins: coinPackage.coins,
+                mints: coinPackage.mints ?? coinPackage.coins,
                 liveMode: true,
             },
         });
@@ -170,6 +172,7 @@ exports.verifyCoinPayment = async (req, res) => {
             orderId,
             paymentId,
             creditedCoins: paymentRecord.coins,
+            creditedMints: paymentRecord.coins,
             data: wallet
         });
     } catch (err) {
@@ -228,7 +231,7 @@ exports.recoverCoinPayment = async (req, res) => {
 exports.verifyStoreCoinPurchase = async (req, res) => {
     return res.status(410).json({
         success: false,
-        message: 'Store coin purchases are disabled. Use Razorpay live checkout.'
+        message: 'Store Mint purchases are disabled. Use Razorpay live checkout.'
     });
 };
 

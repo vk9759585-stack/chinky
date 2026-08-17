@@ -26,6 +26,10 @@ const giftSchema = new mongoose.Schema(
 
         creatorShareCoins: { type: Number, default: 0, min: 0 },
 
+        creatorCoinMinor: { type: Number, default: 0, min: 0 },
+        platformShareMints: { type: Number, default: 0, min: 0 },
+
+
         platformShareCoins: { type: Number, default: 0, min: 0 },
 
         effectKey: { type: String, default: 'pop', trim: true, maxlength: 40 },

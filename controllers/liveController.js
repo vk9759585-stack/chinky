@@ -144,7 +144,7 @@ exports.sendGift = async (req, res) => {
     if (String(sessionDoc.hostUserId) === String(req.user.id)) return res.status(400).json({ success: false, message: 'You cannot gift yourself.' });
     const selectedGift = getGift(req.body.giftName);
     if (!selectedGift) return res.status(400).json({ success: false, message: 'Invalid gift' });
-    const { creatorCoins, platformCoins } = splitCoins(selectedGift.coins);
+    const { creatorCoinMinor, platformMints } = splitCoins(selectedGift.coins);
     const result = await runFinancialTransaction(async (dbSession) => {
       const created = await Gift.create([{
         sender: req.user.id,
@@ -153,8 +153,10 @@ exports.sendGift = async (req, res) => {
         coins: selectedGift.coins,
         sourceType: 'live',
         sourceId: sessionDoc.liveID,
-        creatorShareCoins: creatorCoins,
-        platformShareCoins: platformCoins,
+        creatorShareCoins: 0,
+                creatorCoinMinor,
+                platformShareMints: platformMints,
+        platformShareCoins: 0,
         effectKey: selectedGift.coins >= 1000 ? 'fullscreen' : selectedGift.coins >= 250 ? 'burst' : 'pop',
       }], { session: dbSession });
       const gift = created[0];
@@ -169,7 +171,7 @@ exports.sendGift = async (req, res) => {
       });
       await creditCreatorEarnings({
         user: sessionDoc.hostUserId,
-        coins: creatorCoins,
+        coinMinor: creatorCoinMinor,
         transactionType: 'live_gift_received',
         referenceType: 'gift',
         referenceId: gift._id,
@@ -190,12 +192,12 @@ exports.sendGift = async (req, res) => {
             receiver: sessionDoc.hostUserId,
             type: "gift",
             title: "New Live gift",
-            body: `${selectedGift.name} • ${selectedGift.coins} coins`,
+            body: `${selectedGift.name} • ${selectedGift.coins} Mints`,
             link: `/live/${sessionDoc.liveID}`
         }).catch(() => null);
-    req.app.get("io")?.to(`user:${String(sessionDoc.hostUserId)}`).emit('gift:received', { sourceType: 'live', sourceId: sessionDoc.liveID, giftName: selectedGift.name, coins: selectedGift.coins });
-    req.app.get("io")?.to(`live:${sessionDoc.liveID}`).emit('live:gift', { giftName: selectedGift.name, coins: selectedGift.coins, senderId: String(req.user.id), effectKey: result.gift.effectKey });
-    return res.json({ success: true, coins: result.senderWallet.coins, gift: { id: result.gift._id, name: result.gift.giftName, coins: result.gift.coins, effectKey: result.gift.effectKey } });
+    req.app.get("io")?.to(`user:${String(sessionDoc.hostUserId)}`).emit('gift:received', { sourceType: 'live', sourceId: sessionDoc.liveID, giftName: selectedGift.name, mints: selectedGift.coins, coins: selectedGift.coins });
+    req.app.get("io")?.to(`live:${sessionDoc.liveID}`).emit('live:gift', { giftName: selectedGift.name, mints: selectedGift.coins, coins: selectedGift.coins, senderId: String(req.user.id), effectKey: result.gift.effectKey });
+    return res.json({ success: true, mints: result.senderWallet.coins, coins: result.senderWallet.coins, gift: { id: result.gift._id, name: result.gift.giftName, mints: result.gift.coins, coins: result.gift.coins, creatorCoins: result.gift.creatorCoinMinor / 100, effectKey: result.gift.effectKey } });
   } catch (error) {
     const status = String(error.message || '').includes('Insufficient') ? 400 : 500;
     return res.status(status).json({ success: false, message: error.message });

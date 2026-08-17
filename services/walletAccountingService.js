@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Wallet = require('../models/Wallet');
 const WalletLedger = require('../models/WalletLedger');
 
-const emptyWallet = (user) => ({ user, coins: 0, balance: 0, purchasedCoins: 0, rewardCoins: 0, earnedCoins: 0 });
+const emptyWallet = (user) => ({ user, coins: 0, balance: 0, purchasedCoins: 0, rewardCoins: 0, earnedCoins: 0, earnedCoinMinor: 0 });
 
 async function getOrCreateWallet(user, session) {
   const options = { new: true, upsert: true, setDefaultsOnInsert: true };
@@ -11,13 +11,25 @@ async function getOrCreateWallet(user, session) {
 }
 
 function normalizeBuckets(wallet) {
-  wallet.purchasedCoins = Math.max(0, Number(wallet.purchasedCoins || 0));
-  wallet.rewardCoins = Math.max(0, Number(wallet.rewardCoins || 0));
-  wallet.earnedCoins = Math.max(0, Number(wallet.earnedCoins || 0));
-  // Backward compatibility for wallets created before buckets existed.
-  const bucketTotal = wallet.purchasedCoins + wallet.rewardCoins + wallet.earnedCoins;
-  const legacyTotal = Math.max(0, Number(wallet.coins || 0));
-  if (bucketTotal < legacyTotal) wallet.rewardCoins += (legacyTotal - bucketTotal);
+  wallet.purchasedCoins = Math.max(0, Math.floor(Number(wallet.purchasedCoins || 0)));
+  wallet.rewardCoins = Math.max(0, Math.floor(Number(wallet.rewardCoins || 0)));
+  wallet.earnedCoins = Math.max(0, Number(wallet.earnedCoins || 0)); // legacy Diamonds/Coins only.
+  wallet.earnedCoinMinor = Math.max(0, Math.floor(Number(wallet.earnedCoinMinor || 0)));
+
+  // Value-preserving migration from the old ₹1-per-Diamond system:
+  // 1 old earned unit (₹1) => 2 new Coins => 200 minor.
+  if (wallet.earnedCoinMinor === 0 && wallet.earnedCoins > 0) {
+    wallet.earnedCoinMinor = Math.round(wallet.earnedCoins * 200);
+    wallet.earnedCoins = 0;
+  }
+
+  // `coins` is now the legacy database field holding total Mints only.
+  const mintBuckets = wallet.purchasedCoins + wallet.rewardCoins;
+  const legacyTotal = Math.max(0, Math.floor(Number(wallet.coins || 0)));
+  if (mintBuckets < legacyTotal) {
+    wallet.rewardCoins += (legacyTotal - mintBuckets);
+  }
+  wallet.coins = wallet.purchasedCoins + wallet.rewardCoins;
 }
 
 function debitBuckets(wallet, amount) {
@@ -29,13 +41,13 @@ function debitBuckets(wallet, amount) {
     remaining -= take;
     if (!remaining) break;
   }
-  if (remaining > 0) throw new Error('Insufficient coin balance');
+  if (remaining > 0) throw new Error('Insufficient Mint balance');
 }
 
 function debitPurchasedCoins(wallet, amount) {
   normalizeBuckets(wallet);
   if (wallet.purchasedCoins < amount) {
-    const error = new Error('Not enough purchased Coins. Free reward Coins cannot be used for gifts.');
+    const error = new Error('Not enough purchased Mints. Free reward Mints cannot be used for gifts.');
     error.code = 'PURCHASED_COINS_REQUIRED';
     throw error;
   }
@@ -50,12 +62,12 @@ async function ledger({ user, transactionType, coinDelta, before, after, referen
 }
 
 async function changeCoins({ user, delta, transactionType, referenceType, referenceId, metadata = {}, session }) {
-  if (!Number.isInteger(delta) || delta === 0) throw new Error('Coin delta must be a non-zero integer');
+  if (!Number.isInteger(delta) || delta === 0) throw new Error('Mint delta must be a non-zero integer');
   const wallet = await getOrCreateWallet(user, session);
   normalizeBuckets(wallet);
   const before = Number(wallet.coins || 0);
   if (delta < 0) {
-    if (before < -delta) throw new Error('Insufficient coin balance');
+    if (before < -delta) throw new Error('Insufficient Mint balance');
     const purchasedOnly = ['spark_gift_sent', 'live_gift_sent', 'gift_sent'].includes(transactionType);
     if (purchasedOnly) {
       debitPurchasedCoins(wallet, -delta);
@@ -77,7 +89,7 @@ async function changeCoins({ user, delta, transactionType, referenceType, refere
 }
 
 async function creditRewardCoins({ user, coins, transactionType, referenceType, referenceId, metadata = {}, session }) {
-  if (!Number.isInteger(coins) || coins <= 0) throw new Error('Reward credit must be a positive integer');
+  if (!Number.isInteger(coins) || coins <= 0) throw new Error('Reward Mint credit must be a positive integer');
   const wallet = await getOrCreateWallet(user, session);
   normalizeBuckets(wallet);
   const before = Number(wallet.coins || 0);
@@ -90,29 +102,51 @@ async function creditRewardCoins({ user, coins, transactionType, referenceType, 
   return wallet;
 }
 
-async function creditCreatorEarnings({ user, coins, transactionType, referenceType, referenceId, metadata = {}, session }) {
-  if (!Number.isInteger(coins) || coins <= 0) throw new Error('Creator credit must be a positive integer');
+async function creditCreatorEarnings({ user, coinMinor, coins, transactionType, referenceType, referenceId, metadata = {}, session }) {
+  const amountMinor = Number.isInteger(coinMinor) ? coinMinor : Number.isInteger(coins) ? coins : 0;
+  if (!Number.isInteger(amountMinor) || amountMinor <= 0) {
+    throw new Error('Creator Coin credit must be a positive minor-unit integer');
+  }
   const wallet = await getOrCreateWallet(user, session);
   normalizeBuckets(wallet);
-  const before = Number(wallet.coins || 0);
-  wallet.coins = before + coins;
-  wallet.earnedCoins += coins;
-  wallet.totalEarned = (wallet.totalEarned || 0) + coins;
+  wallet.earnedCoinMinor += amountMinor;
+  wallet.totalEarned = Number(wallet.totalEarned || 0) + (amountMinor / 100);
   await wallet.save({ session });
-  await ledger({ user, transactionType, coinDelta: coins, before, after: wallet.coins, referenceType, referenceId, metadata, session });
+  await ledger({
+    user,
+    transactionType,
+    coinDelta: 0,
+    before: Number(wallet.coins || 0),
+    after: Number(wallet.coins || 0),
+    referenceType,
+    referenceId,
+    metadata: { ...metadata, earnedCoinMinorDelta: amountMinor },
+    session
+  });
   return wallet;
 }
 
-async function debitEarnedCoins({ user, coins, transactionType, referenceType, referenceId, metadata = {}, session }) {
-  if (!Number.isInteger(coins) || coins <= 0) throw new Error('Withdrawal coin amount must be positive');
+async function debitEarnedCoins({ user, coinMinor, coins, transactionType, referenceType, referenceId, metadata = {}, session }) {
+  const amountMinor = Number.isInteger(coinMinor) ? coinMinor : Number.isInteger(coins) ? coins : 0;
+  if (!Number.isInteger(amountMinor) || amountMinor <= 0) {
+    throw new Error('Withdrawal Coin amount must be positive');
+  }
   const wallet = await getOrCreateWallet(user, session);
   normalizeBuckets(wallet);
-  if (wallet.earnedCoins < coins) throw new Error('Not enough withdrawable coins');
-  const before = Number(wallet.coins || 0);
-  wallet.earnedCoins -= coins;
-  wallet.coins = Math.max(0, before - coins);
+  if (wallet.earnedCoinMinor < amountMinor) throw new Error('Not enough withdrawable Coins');
+  wallet.earnedCoinMinor -= amountMinor;
   await wallet.save({ session });
-  await ledger({ user, transactionType, coinDelta: -coins, before, after: wallet.coins, referenceType, referenceId, metadata, session });
+  await ledger({
+    user,
+    transactionType,
+    coinDelta: 0,
+    before: Number(wallet.coins || 0),
+    after: Number(wallet.coins || 0),
+    referenceType,
+    referenceId,
+    metadata: { ...metadata, earnedCoinMinorDelta: -amountMinor },
+    session
+  });
   return wallet;
 }
 

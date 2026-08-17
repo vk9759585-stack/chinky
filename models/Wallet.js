@@ -27,6 +27,10 @@ const walletSchema = new mongoose.Schema(
 
         earnedCoins: { type: Number, default: 0, min: 0 },
 
+        // Creator Coins in hundredths. Example: 22.39 Coins => 2239.
+        earnedCoinMinor: { type: Number, default: 0, min: 0 },
+
+
         totalCoinsPurchased: { type: Number, default: 0, min: 0 },
 
         totalCoinsSpent: { type: Number, default: 0, min: 0 },

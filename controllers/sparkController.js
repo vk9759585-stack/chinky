@@ -520,7 +520,7 @@ exports.sendGift = async (req, res) => {
         const spark = await Spark.findById(req.params.id).populate("user", "followers");
         if (!spark) return res.status(404).json({ success: false, message: "Spark not found" });
         if (spark.user._id.toString() === req.user.id) return res.status(400).json({ success: false, message: "You cannot send a gift to yourself" });
-        const { creatorCoins, platformCoins } = splitCoins(cost);
+        const { creatorCoinMinor, platformMints } = splitCoins(cost);
         const result = await runFinancialTransaction(async (session) => {
             const gift = await Gift.create([{
                 sender: req.user.id,
@@ -529,8 +529,10 @@ exports.sendGift = async (req, res) => {
                 coins: cost,
                 sourceType: 'spark',
                 sourceId: spark._id.toString(),
-                creatorShareCoins: creatorCoins,
-                platformShareCoins: platformCoins,
+                creatorShareCoins: 0,
+                creatorCoinMinor,
+                platformShareMints: platformMints,
+                platformShareCoins: 0,
             }], { session });
             const referenceId = gift[0]._id.toString();
             const senderWallet = await changeCoins({
@@ -538,20 +540,20 @@ exports.sendGift = async (req, res) => {
                 referenceType: 'gift', referenceId, metadata: { sparkId: spark._id.toString(), giftName: req.body.giftName }, session,
             });
             await creditCreatorEarnings({
-                user: spark.user._id, coins: creatorCoins, transactionType: 'spark_gift_received',
+                user: spark.user._id, coinMinor: creatorCoinMinor, transactionType: 'spark_gift_received',
                 referenceType: 'gift', referenceId, metadata: { sparkId: spark._id.toString(), giftName: req.body.giftName }, session,
             });
-            return { gift: gift[0], coins: senderWallet.coins };
+            return { gift: gift[0], mints: senderWallet.coins };
         });
         await createSocialNotification(req, {
             sender: req.user.id,
             receiver: spark.user._id,
             type: "gift",
             title: "New Spark gift",
-            body: `${req.body.giftName} • ${cost} coins`,
+            body: `${req.body.giftName} • ${cost} Mints`,
             link: `/spark/${spark._id}`
         }).catch(() => null);
-        req.app.get("io")?.to(`user:${String(spark.user._id)}`).emit('gift:received', { sourceType: 'spark', sourceId: String(spark._id), giftName: req.body.giftName, coins: cost });
-        return res.json({ success: true, coins: result.coins, gift: { id: result.gift._id, name: result.gift.giftName, coins: result.gift.coins } });
+        req.app.get("io")?.to(`user:${String(spark.user._id)}`).emit('gift:received', { sourceType: 'spark', sourceId: String(spark._id), giftName: req.body.giftName, mints: cost, coins: cost });
+        return res.json({ success: true, mints: result.mints, coins: result.mints, gift: { id: result.gift._id, name: result.gift.giftName, mints: result.gift.coins, coins: result.gift.coins, creatorCoins: result.gift.creatorCoinMinor / 100 } });
     } catch (err) { return res.status(500).json({ success: false, message: err.message }); }
 };

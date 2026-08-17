@@ -216,7 +216,7 @@ exports.updateWithdrawalStatus = async (req, res) => {
       row.status = status; row.reviewedBy = req.user.id; row.reviewedAt = new Date(); row.note = String(req.body.note || '');
       await row.save({ session });
       if (status === 'rejected') {
-        await creditCreatorEarnings({ user: row.user, coins: row.coins, transactionType: 'withdrawal_refund', referenceType: 'withdrawal', referenceId: row._id, metadata: { reason: row.note }, session });
+        await creditCreatorEarnings({ user: row.user, coinMinor: Number(row.grossAmountPaise || 0) > 0 ? Number(row.grossAmountPaise) * 2 : Number(row.coins || 0), transactionType: 'withdrawal_refund', referenceType: 'withdrawal', referenceId: row._id, metadata: { reason: row.note }, session });
       } else if (status === 'paid') {
         const Wallet = require('../models/Wallet');
         await Wallet.updateOne({ user: row.user }, { $inc: { totalWithdrawnPaise: row.amountPaise } }, { session });
@@ -274,12 +274,12 @@ exports.reviewWithdrawalRequest = async (req,res)=>{
       if(!row)throw new Error('Request not found');
       if(row.status!=='pending')return row;
 
-      // IMPORTANT: earned diamonds were already reserved/debited when the
+      // IMPORTANT: earned Coins were already reserved/debited when the
       // withdrawal request was created. Never debit them a second time here.
       if(decision==='rejected'){
         await creditCreatorEarnings({
           user:row.user,
-          coins:row.coins,
+          coinMinor:Number(row.grossAmountPaise || 0) > 0 ? Number(row.grossAmountPaise) * 2 : Number(row.coins || 0),
           transactionType:'withdrawal_refund',
           referenceType:'withdrawal',
           referenceId:row._id,
