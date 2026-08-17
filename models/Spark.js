@@ -35,7 +35,20 @@ const sparkSchema = new mongoose.Schema(
 
         video: {
             type: String,
-            required: true
+            default: ""
+        },
+
+        publishStatus: {
+            type: String,
+            enum: ["processing", "ready", "failed"],
+            default: "ready",
+            index: true
+        },
+
+        publishError: {
+            type: String,
+            default: "",
+            select: false
         },
 
         videoPublicId: {

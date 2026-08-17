@@ -136,146 +136,246 @@ exports.createSpark = async (req, res) => {
     const videoFile = req.files?.video?.[0];
     const overlayFile = req.files?.overlay?.[0];
     const uploadKey = String(req.body.clientUploadId || "").trim().slice(0, 160);
+    const userId = req.user.id;
+    const requestBody = { ...req.body };
+    const fallbackVideoUrl = videoFile
+        ? `${req.protocol}://${req.get("host")}/uploads/${videoFile.filename}`
+        : "";
+
     try {
         if (uploadKey) {
-            const existing = await Spark.findOne({ user: req.user.id, uploadKey });
+            const existing = await Spark.findOne({ user: userId, uploadKey })
+                .select("+uploadKey +publishError");
             if (existing) {
                 await fs.promises.unlink(videoFile?.path || "").catch(() => {});
                 await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
-                return res.status(200).json({ success: true, data: existing, duplicate: true });
+                return res.status(existing.publishStatus === "processing" ? 202 : 200).json({
+                    success: true,
+                    accepted: true,
+                    duplicate: true,
+                    publishStatus: existing.publishStatus || "ready",
+                    data: existing
+                });
             }
         }
+
         if (!videoFile) {
             await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
-            return res.status(400).json({ success: false, message: "Spark video is required" });
-        }
-
-        const edit = editFromBody(req.body.edit, req.body.filter || "Original");
-        let videoUrl = "";
-        let videoPublicId = "";
-        let thumbnail = (req.body.thumbnail || "").trim();
-
-        try {
-            const upload = await cloudinary.uploader.upload(videoFile.path, {
-                resource_type: "video",
-                folder: "chinky/sparks",
-                // Store the uploaded video first. A synchronous resize here
-                // made the mobile request sit at 99% while Cloudinary encoded
-                // the video. Delivery can still use Cloudinary transformations
-                // without blocking publish.
-                ...moderationUploadOptions("video")
+            return res.status(400).json({
+                success: false,
+                message: "Spark video is required"
             });
-            if (moderationRejected(upload)) {
-                await cloudinary.uploader.destroy(upload.public_id, {
-                    resource_type: "video",
-                    invalidate: true
-                }).catch(() => {});
-                await fs.promises.unlink(videoFile.path).catch(() => {});
-                await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
-                return res.status(422).json({
-                    success: false,
-                    code: "sexual_content_detected",
-                    message: "Spark removed: sexual or adult content is not allowed."
-                });
-            }
-            videoUrl = upload.secure_url;
-            videoPublicId = upload.public_id || "";
-            var videoModerationStatus = moderationStatus(upload);
-            if (!thumbnail) thumbnail = sparkThumbnail(upload);
-            await fs.promises.unlink(videoFile.path).catch(() => {});
-        } catch (error) {
-            if (moderationEnabled) {
-                await fs.promises.unlink(videoFile.path).catch(() => {});
-                await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
-                return res.status(503).json({
-                    success: false,
-                    code: "moderation_unavailable",
-                    message: "Safety scan is temporarily unavailable. Please retry the upload."
-                });
-            }
-            videoUrl = `${req.protocol}://${req.get("host")}/uploads/${videoFile.filename}`;
         }
 
-        if (overlayFile) {
-            try {
-                const overlayUpload = await cloudinary.uploader.upload(overlayFile.path, {
-                    resource_type: "image",
-                    folder: "chinky/overlays",
-                    transformation: [{ width: 1200, crop: "limit" }],
-                    ...moderationUploadOptions("image")
-                });
-                if (moderationRejected(overlayUpload)) {
-                    await cloudinary.uploader.destroy(overlayUpload.public_id, {
-                        resource_type: "image",
-                        invalidate: true
-                    }).catch(() => {});
-                    if (videoPublicId) {
-                        await cloudinary.uploader.destroy(videoPublicId, {
-                            resource_type: "video",
-                            invalidate: true
-                        }).catch(() => {});
-                    }
-                    await fs.promises.unlink(overlayFile.path).catch(() => {});
-                    return res.status(422).json({
-                        success: false,
-                        code: "sexual_content_detected",
-                        message: "Spark removed: sexual or adult content is not allowed."
-                    });
-                }
-                edit.overlayImageUrl = overlayUpload.secure_url || "";
-                await fs.promises.unlink(overlayFile.path).catch(() => {});
-            } catch (_) {
-                await fs.promises.unlink(overlayFile.path).catch(() => {});
-                return res.status(502).json({ success: false, message: "Overlay image could not be stored." });
-            }
-        }
+        const edit = editFromBody(requestBody.edit, requestBody.filter || "Original");
 
+        // Create the server record immediately after the multipart body arrives.
+        // Cloudinary upload, moderation and original-audio creation continue in
+        // the background. This prevents the mobile app sitting at 99% while
+        // the server performs slow media processing.
         const spark = await Spark.create({
-            user: req.user.id,
+            user: userId,
             uploadKey,
-            caption: req.body.caption || "",
-            video: videoUrl,
-            videoPublicId,
-            moderationStatus: videoModerationStatus || (moderationEnabled ? "pending" : "approved"),
+            publishStatus: "processing",
+            publishError: "",
+            caption: requestBody.caption || "",
+            video: "",
+            videoPublicId: "",
+            moderationStatus: moderationEnabled ? "pending" : "approved",
             moderationKind: moderationEnabled ? "aws_rek_video" : "",
-            thumbnail,
-            music: req.body.music || "",
-            audio: req.body.audioId || null,
-            filter: req.body.filter || "Original",
+            thumbnail: (requestBody.thumbnail || "").trim(),
+            music: requestBody.music || "",
+            audio: requestBody.audioId || null,
+            filter: requestBody.filter || "Original",
             edit,
-            duration: Number(req.body.duration) || 0,
-            hashtags: listFromBody(req.body.hashtags),
-            location: req.body.location || "",
-            taggedUsers: listFromBody(req.body.taggedUsers),
-            products: listFromBody(req.body.products),
-            remixOf: mongoose.Types.ObjectId.isValid(String(req.body.remixOf || '')) ? req.body.remixOf : null,
-            remixType: ['duet','remix'].includes(String(req.body.remixType || '')) ? req.body.remixType : 'none'
+            duration: Number(requestBody.duration) || 0,
+            hashtags: listFromBody(requestBody.hashtags),
+            location: requestBody.location || "",
+            taggedUsers: listFromBody(requestBody.taggedUsers),
+            products: listFromBody(requestBody.products),
+            remixOf: mongoose.Types.ObjectId.isValid(String(requestBody.remixOf || ""))
+                ? requestBody.remixOf
+                : null,
+            remixType: ["duet", "remix"].includes(String(requestBody.remixType || ""))
+                ? requestBody.remixType
+                : "none"
         });
 
-        if (req.body.audioId) {
-            await Audio.updateOne({ _id: req.body.audioId, reusable: true, blocked: false }, { $inc: { usageCount: 1 } }).catch(() => {});
-        } else if (videoPublicId) {
-            try {
-                const audioUrl = cloudinary.url(videoPublicId, { resource_type: "video", secure: true, format: "mp3" });
-                const audio = await Audio.create({
-                    owner: req.user.id,
-                    sourceSpark: spark._id,
-                    title: req.body.music && req.body.music !== "Mute" ? req.body.music : "Original audio",
-                    streamUrl: audioUrl,
-                    duration: Number(req.body.duration) || 0,
-                    coverUrl: thumbnail,
-                    isOriginal: true,
-                    reusable: true
-                });
-                spark.audio = audio._id;
-                await spark.save();
-            } catch (_) {}
-        }
+        // Respond now: the device upload has safely reached the server.
+        res.status(202).json({
+            success: true,
+            accepted: true,
+            publishStatus: "processing",
+            data: {
+                _id: spark._id,
+                uploadKey,
+                publishStatus: "processing"
+            }
+        });
 
-        return res.status(201).json({ success: true, data: spark });
+        // Do not await the slow Cloudinary/moderation phase.
+        setImmediate(async () => {
+            let videoPublicId = "";
+            try {
+                let videoUrl = "";
+                let thumbnail = spark.thumbnail || "";
+                let videoModerationStatus = moderationEnabled ? "pending" : "approved";
+
+                try {
+                    const upload = await cloudinary.uploader.upload(videoFile.path, {
+                        resource_type: "video",
+                        folder: "chinky/sparks",
+                        ...moderationUploadOptions("video")
+                    });
+
+                    videoPublicId = upload.public_id || "";
+
+                    if (moderationRejected(upload)) {
+                        if (videoPublicId) {
+                            await cloudinary.uploader.destroy(videoPublicId, {
+                                resource_type: "video",
+                                invalidate: true
+                            }).catch(() => {});
+                        }
+                        await Spark.findByIdAndUpdate(spark._id, {
+                            $set: {
+                                publishStatus: "failed",
+                                publishError: "sexual_content_detected",
+                                moderationStatus: "rejected",
+                                moderationCheckedAt: new Date()
+                            }
+                        }).catch(() => {});
+                        return;
+                    }
+
+                    videoUrl = upload.secure_url || "";
+                    videoModerationStatus = moderationStatus(upload);
+                    if (!thumbnail) thumbnail = sparkThumbnail(upload);
+                } catch (error) {
+                    if (moderationEnabled) {
+                        await Spark.findByIdAndUpdate(spark._id, {
+                            $set: {
+                                publishStatus: "failed",
+                                publishError: "moderation_unavailable"
+                            }
+                        }).catch(() => {});
+                        return;
+                    }
+                    videoUrl = fallbackVideoUrl;
+                } finally {
+                    await fs.promises.unlink(videoFile.path).catch(() => {});
+                }
+
+                if (overlayFile) {
+                    try {
+                        const overlayUpload = await cloudinary.uploader.upload(overlayFile.path, {
+                            resource_type: "image",
+                            folder: "chinky/overlays",
+                            transformation: [{ width: 1200, crop: "limit" }],
+                            ...moderationUploadOptions("image")
+                        });
+
+                        if (moderationRejected(overlayUpload)) {
+                            await cloudinary.uploader.destroy(overlayUpload.public_id, {
+                                resource_type: "image",
+                                invalidate: true
+                            }).catch(() => {});
+                            if (videoPublicId) {
+                                await cloudinary.uploader.destroy(videoPublicId, {
+                                    resource_type: "video",
+                                    invalidate: true
+                                }).catch(() => {});
+                            }
+                            await Spark.findByIdAndUpdate(spark._id, {
+                                $set: {
+                                    publishStatus: "failed",
+                                    publishError: "sexual_content_detected",
+                                    moderationStatus: "rejected",
+                                    moderationCheckedAt: new Date()
+                                }
+                            }).catch(() => {});
+                            return;
+                        }
+
+                        edit.overlayImageUrl = overlayUpload.secure_url || "";
+                    } catch (_) {
+                        await Spark.findByIdAndUpdate(spark._id, {
+                            $set: {
+                                publishStatus: "failed",
+                                publishError: "overlay_upload_failed"
+                            }
+                        }).catch(() => {});
+                        return;
+                    } finally {
+                        await fs.promises.unlink(overlayFile.path).catch(() => {});
+                    }
+                }
+
+                let audioId = requestBody.audioId || null;
+
+                if (requestBody.audioId) {
+                    await Audio.updateOne(
+                        { _id: requestBody.audioId, reusable: true, blocked: false },
+                        { $inc: { usageCount: 1 } }
+                    ).catch(() => {});
+                } else if (videoPublicId) {
+                    try {
+                        const audioUrl = cloudinary.url(videoPublicId, {
+                            resource_type: "video",
+                            secure: true,
+                            format: "mp3"
+                        });
+                        const audio = await Audio.create({
+                            owner: userId,
+                            sourceSpark: spark._id,
+                            title: requestBody.music && requestBody.music !== "Mute"
+                                ? requestBody.music
+                                : "Original audio",
+                            streamUrl: audioUrl,
+                            duration: Number(requestBody.duration) || 0,
+                            coverUrl: thumbnail,
+                            isOriginal: true,
+                            reusable: true
+                        });
+                        audioId = audio._id;
+                    } catch (_) {}
+                }
+
+                await Spark.findByIdAndUpdate(spark._id, {
+                    $set: {
+                        video: videoUrl,
+                        videoPublicId,
+                        thumbnail,
+                        audio: audioId,
+                        edit,
+                        moderationStatus:
+                            videoModerationStatus || (moderationEnabled ? "pending" : "approved"),
+                        publishStatus: "ready",
+                        publishError: ""
+                    }
+                });
+            } catch (error) {
+                await fs.promises.unlink(videoFile?.path || "").catch(() => {});
+                await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
+                await Spark.findByIdAndUpdate(spark._id, {
+                    $set: {
+                        publishStatus: "failed",
+                        publishError: String(error?.message || "spark_finalization_failed").slice(0, 300)
+                    }
+                }).catch(() => {});
+            }
+        });
+
+        return;
     } catch (err) {
+        await fs.promises.unlink(videoFile?.path || "").catch(() => {});
         await fs.promises.unlink(overlayFile?.path || "").catch(() => {});
-        return res.status(500).json({ success: false, message: err.message });
+        if (!res.headersSent) {
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
     }
 };
 
@@ -284,12 +384,37 @@ exports.getUploadStatus = async (req, res) => {
         res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
         res.set("Pragma", "no-cache");
         res.set("Expires", "0");
+
         const uploadKey = String(req.params.key || "").trim();
-        if (!uploadKey) return res.json({ success: true, found: false });
-        const item = await Spark.findOne({ user: req.user.id, uploadKey }).select("_id").lean();
-        return res.json({ success: true, found: Boolean(item), id: item?._id || null });
+        if (!uploadKey) {
+            return res.json({
+                success: true,
+                found: false,
+                publishStatus: "missing"
+            });
+        }
+
+        const item = await Spark.findOne({
+            user: req.user.id,
+            uploadKey
+        })
+            .select("_id publishStatus moderationStatus")
+            .lean();
+
+        return res.json({
+            success: true,
+            found: Boolean(item),
+            accepted: Boolean(item),
+            id: item?._id || null,
+            publishStatus: item?.publishStatus || (item ? "ready" : "missing"),
+            moderationStatus: item?.moderationStatus || null
+        });
     } catch (_) {
-        return res.status(500).json({ success: false, found: false });
+        return res.status(500).json({
+            success: false,
+            found: false,
+            publishStatus: "unknown"
+        });
     }
 };
 
@@ -311,9 +436,19 @@ exports.getSparks = async (req, res) => {
             ...(before && !Number.isNaN(before.getTime())
                 ? { createdAt: { $lt: before } }
                 : {}),
-            $or: [
-                { moderationStatus: { $exists: false } },
-                { moderationStatus: "approved" }
+            $and: [
+                {
+                    $or: [
+                        { publishStatus: { $exists: false } },
+                        { publishStatus: "ready" }
+                    ]
+                },
+                {
+                    $or: [
+                        { moderationStatus: { $exists: false } },
+                        { moderationStatus: "approved" }
+                    ]
+                }
             ]
         };
 
