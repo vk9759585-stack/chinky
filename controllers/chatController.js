@@ -848,3 +848,16 @@ exports.getConversations = async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 };
+
+exports.reportMessage = async (req, res) => {
+  try {
+    const Report = require('../models/Report');
+    const message = await Chat.findById(req.params.id);
+    if (!message) return res.status(404).json({success:false,message:'Message not found'});
+    const uid=req.user.id.toString();
+    if(message.sender.toString()!==uid && message.receiver.toString()!==uid) return res.status(403).json({success:false,message:'Forbidden'});
+    const targetUser=message.sender.toString()===uid ? message.receiver : message.sender;
+    await Report.create({reporter:req.user.id,targetUser,targetMessage:message._id,targetType:'chat_message',reason:(req.body.reason||'Inappropriate message').trim()});
+    return res.json({success:true,message:'Report submitted'});
+  } catch(err){return res.status(500).json({success:false,message:err.message});}
+};

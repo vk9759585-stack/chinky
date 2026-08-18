@@ -22,7 +22,9 @@ exports.getComments = async (req, res) => {
                 .limit(limit),
             Comment.countDocuments(filter)
         ]);
-        return res.status(200).json({ success: true, page, count: comments.length, total, hasMore: skip + comments.length < total, data: comments });
+        const uid = req.user.id.toString();
+        const data = comments.map(c => { const o=c.toObject(); return {...o, likesCount:(o.likes||[]).length, liked:(o.likes||[]).some(id=>id.toString()===uid)}; });
+        return res.status(200).json({ success: true, page, count: comments.length, total, hasMore: skip + comments.length < total, data });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
     }
@@ -256,4 +258,28 @@ exports.addReply = async (req, res) => {
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
     }
+};
+
+
+exports.toggleCommentLike = async (req, res) => {
+  try {
+    const comment = await Comment.findOne({ _id: req.params.commentId, post: req.params.id });
+    if (!comment) return res.status(404).json({ success:false, message:'Comment not found' });
+    const uid = req.user.id.toString();
+    const liked = comment.likes.some(id => id.toString() === uid);
+    if (liked) comment.likes.pull(req.user.id); else comment.likes.addToSet(req.user.id);
+    await comment.save();
+    return res.json({ success:true, liked: !liked, likesCount: comment.likes.length });
+  } catch (err) { return res.status(500).json({ success:false, message:err.message }); }
+};
+
+exports.reportComment = async (req, res) => {
+  try {
+    const Report = require('../models/Report');
+    const comment = await Comment.findOne({ _id: req.params.commentId, post: req.params.id });
+    if (!comment) return res.status(404).json({ success:false, message:'Comment not found' });
+    const reason = (req.body.reason || 'Inappropriate comment').trim();
+    await Report.create({ reporter:req.user.id, targetUser:comment.user, targetComment:comment._id, targetType:'post_comment', reason });
+    return res.json({ success:true, message:'Report submitted' });
+  } catch (err) { return res.status(500).json({ success:false, message:err.message }); }
 };

@@ -19,5 +19,9 @@ router.post("/", authMiddleware, sparkCommentController.addComment);
 
 // GET /spark-comments/:id -> Get comments by spark ID
 router.get("/:id", authMiddleware, sparkCommentController.getComments);
+router.put("/:id/:commentId", authMiddleware, sparkCommentController.editComment);
+router.delete("/:id/:commentId", authMiddleware, sparkCommentController.deleteComment);
+router.post("/:id/:commentId/like", authMiddleware, sparkCommentController.toggleCommentLike);
+router.post("/:id/:commentId/report", authMiddleware, sparkCommentController.reportComment);
 
 module.exports = router;

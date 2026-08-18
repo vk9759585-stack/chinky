@@ -41,4 +41,7 @@ router.delete(
     controller.deleteComment
 );
 
+router.post("/:id/:commentId/like", auth, controller.toggleCommentLike);
+router.post("/:id/:commentId/report", auth, controller.reportComment);
+
 module.exports = router;

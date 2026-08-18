@@ -349,11 +349,17 @@ exports.getCallHistory = async (req, res) => {
 
         return res.json({
             success: true,
-            data: calls.map((call) => ({
-                ...call,
-                isCaller: String(call.caller?._id || call.caller) === String(req.user.id),
-                otherUser: String(call.caller?._id || call.caller) === String(req.user.id) ? call.receiver : call.caller
-            }))
+            data: calls.map((call) => {
+                const isCaller = String(call.caller?._id || call.caller) === String(req.user.id);
+                return {
+                    ...call,
+                    isCaller,
+                    direction: isCaller ? "outgoing" : "incoming",
+                    callerId: String(call.caller?._id || call.caller || ""),
+                    receiverId: String(call.receiver?._id || call.receiver || ""),
+                    otherUser: isCaller ? call.receiver : call.caller
+                };
+            })
         });
     } catch (err) {
         return res.status(500).json({

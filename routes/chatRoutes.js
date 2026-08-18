@@ -125,6 +125,8 @@ router.delete(
     controller.deleteForEveryone
 );
 
+router.post("/report/:id", auth, controller.reportMessage);
+
 // Backwards-compatible endpoint used by the Flutter chat service.
 router.delete("/:id", auth, controller.deleteForMe);
 

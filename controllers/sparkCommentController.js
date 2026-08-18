@@ -86,8 +86,55 @@ exports.getComments = async (req, res) => {
                 .limit(limit),
             SparkComment.countDocuments({ reel: req.params.id })
         ]);
-        return res.json({ success: true, page, count: comments.length, total, hasMore: skip + comments.length < total, data: comments });
+        const uid = req.user.id.toString();
+        const data = comments.map(c => { const o=c.toObject(); return {...o, likesCount:(o.likes||[]).length, liked:(o.likes||[]).some(id=>id.toString()===uid)}; });
+        return res.json({ success: true, page, count: comments.length, total, hasMore: skip + comments.length < total, data });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
     }
+};
+
+
+exports.toggleCommentLike = async (req, res) => {
+  try {
+    const comment = await SparkComment.findOne({ _id: req.params.commentId, reel: req.params.id });
+    if (!comment) return res.status(404).json({ success:false, message:'Comment not found' });
+    const uid = req.user.id.toString();
+    const liked = comment.likes.some(id => id.toString() === uid);
+    if (liked) comment.likes.pull(req.user.id); else comment.likes.addToSet(req.user.id);
+    await comment.save();
+    return res.json({ success:true, liked: !liked, likesCount: comment.likes.length });
+  } catch (err) { return res.status(500).json({ success:false, message:err.message }); }
+};
+
+exports.reportComment = async (req, res) => {
+  try {
+    const Report = require('../models/Report');
+    const comment = await SparkComment.findOne({ _id: req.params.commentId, reel: req.params.id });
+    if (!comment) return res.status(404).json({ success:false, message:'Comment not found' });
+    const reason = (req.body.reason || 'Inappropriate comment').trim();
+    await Report.create({ reporter:req.user.id, targetUser:comment.user, targetComment:comment._id, targetType:'spark_comment', reason });
+    return res.json({ success:true, message:'Report submitted' });
+  } catch (err) { return res.status(500).json({ success:false, message:err.message }); }
+};
+
+exports.editComment = async (req, res) => {
+  try {
+    const comment = await SparkComment.findOne({ _id:req.params.commentId, reel:req.params.id });
+    if (!comment) return res.status(404).json({ success:false, message:'Comment not found' });
+    if (comment.user.toString() !== req.user.id.toString()) return res.status(401).json({ success:false, message:'Unauthorized' });
+    const text=(req.body.comment||'').trim(); if(!text) return res.status(400).json({success:false,message:'Comment cannot be empty'});
+    comment.comment=text; await comment.save(); const result=await populatedComment(comment._id);
+    return res.json({success:true,data:result});
+  } catch(err){ return res.status(500).json({success:false,message:err.message}); }
+};
+exports.deleteComment = async (req, res) => {
+  try {
+    const comment = await SparkComment.findOne({ _id:req.params.commentId, reel:req.params.id });
+    if (!comment) return res.status(404).json({success:false,message:'Comment not found'});
+    if(comment.user.toString()!==req.user.id.toString()) return res.status(401).json({success:false,message:'Unauthorized'});
+    const isTop=!comment.parentComment;
+    await Promise.all([SparkComment.findByIdAndDelete(comment._id), SparkComment.deleteMany({parentComment:comment._id}), Spark.findByIdAndUpdate(req.params.id,{$pull:{comments:comment._id}})]);
+    return res.json({success:true,message:'Comment deleted',topLevel:isTop});
+  } catch(err){ return res.status(500).json({success:false,message:err.message}); }
 };

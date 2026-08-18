@@ -23,6 +23,14 @@ const reportSchema = new mongoose.Schema(
         ref: "Spark",
     },
 
+    targetComment: {
+        type: mongoose.Schema.Types.ObjectId,
+    },
+
+    targetMessage: { type: mongoose.Schema.Types.ObjectId, ref: "Chat" },
+
+    targetType: { type: String, enum: ["post_comment", "spark_comment", "chat_message"] },
+
     reason: {
         type: String,
         required: true,
