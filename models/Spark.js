@@ -208,6 +208,8 @@ const sparkSchema = new mongoose.Schema(
 sparkSchema.index({ user: 1, createdAt: -1 });
 sparkSchema.index({ taggedUsers: 1, createdAt: -1 });
 sparkSchema.index({ createdAt: -1 });
+sparkSchema.index({ publishStatus: 1, moderationStatus: 1, createdAt: -1 });
+sparkSchema.index({ user: 1, uploadKey: 1 });
 
 module.exports = mongoose.model(
     "Spark",

@@ -207,6 +207,10 @@ postSchema.index({
     createdAt: -1
 });
 
+// Feed visibility + idempotent upload lookups.
+postSchema.index({ moderationStatus: 1, createdAt: -1 });
+postSchema.index({ user: 1, uploadKey: 1 });
+
 module.exports = mongoose.model(
     "Post",
     postSchema

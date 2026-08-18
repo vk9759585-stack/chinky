@@ -40,21 +40,25 @@ exports.createNotification = async (req, res) => {
 
 exports.getNotifications = async (req, res) => {
     try {
-        const notifications = await Notification.find({
-            receiver: req.user.id || req.user._id || req.user.userId
-        })
-            .populate(
-                "sender",
-                "username profileImage verified"
-            )
-            .sort({
-                createdAt: -1
-            });
+        const userId = req.user.id || req.user._id || req.user.userId;
+        const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+        const before = req.query.before ? new Date(req.query.before) : null;
+        const filter = {
+            receiver: userId,
+            ...(before && !Number.isNaN(before.getTime()) ? { createdAt: { $lt: before } } : {})
+        };
+
+        const notifications = await Notification.find(filter)
+            .populate("sender", "username profileImage verified")
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .lean();
 
         return res.json({
             success: true,
             count: notifications.length,
-            data: notifications
+            data: notifications,
+            nextCursor: notifications.length ? notifications[notifications.length - 1].createdAt : null
         });
 
     } catch (err) {
@@ -104,9 +108,11 @@ exports.markRead = async (req, res) => {
 exports.deleteNotification = async (req, res) => {
     try {
 
-        await Notification.findByIdAndDelete(
-            req.params.id
-        );
+        const userId = (req.user.id || req.user._id || req.user.userId).toString();
+        const deleted = await Notification.findOneAndDelete({ _id: req.params.id, receiver: userId });
+        if (!deleted) {
+            return res.status(404).json({ success: false, message: "Notification not found" });
+        }
 
         return res.json({
             success: true,

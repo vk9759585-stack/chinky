@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Spark = require("../models/Spark");
+const User = require("../models/User");
 const Report = require("../models/Report");
 const cloudinary = require("../config/cloudinary");
 const {
@@ -424,18 +425,15 @@ exports.getUploadStatus = async (req, res) => {
 
 exports.getSparks = async (req, res) => {
     try {
-        // Spark feed must reflect a newly published Spark immediately. Prevent
-        // proxies/clients from reusing a stale list response.
         res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
         res.set("Pragma", "no-cache");
         res.set("Expires", "0");
-        const viewerId = (req.user.id || req.user._id || req.user.userId).toString();
+
+        const viewerId = String(req.user.id || req.user._id || req.user.userId || "");
         const limit = Math.min(Math.max(Number(req.query.limit) || 15, 1), 30);
         const before = req.query.before ? new Date(req.query.before) : null;
         const filter = {
-            ...(before && !Number.isNaN(before.getTime())
-                ? { createdAt: { $lt: before } }
-                : {}),
+            ...(before && !Number.isNaN(before.getTime()) ? { createdAt: { $lt: before } } : {}),
             $and: [
                 {
                     $or: [
@@ -453,31 +451,67 @@ exports.getSparks = async (req, res) => {
             ]
         };
 
-        // Fetch a small page instead of loading the whole Spark collection.
-        // A little over-fetch helps after private-account filtering.
+        const viewer = await User.findById(viewerId).select("following").lean();
+        const followingIds = new Set((viewer?.following || []).map((id) => id.toString()));
+
         const sparks = await Spark.find(filter)
-            .populate("user", "name username profileImage verified isPrivate isDeactivated followers")
+            .select("-viewedBy")
             .populate("audio", "title artistName streamUrl duration coverUrl owner usageCount")
             .sort({ createdAt: -1 })
             .limit(limit * 2)
             .lean();
 
+        const ownerIds = [...new Set(sparks.map((spark) => spark.user?.toString()).filter(Boolean))];
+        const owners = ownerIds.length
+            ? await User.aggregate([
+                { $match: { _id: { $in: ownerIds.map((id) => new mongoose.Types.ObjectId(id)) } } },
+                {
+                    $project: {
+                        name: 1,
+                        username: 1,
+                        profileImage: 1,
+                        verified: 1,
+                        isPrivate: 1,
+                        isDeactivated: 1,
+                        followerCount: { $size: { $ifNull: ["$followers", []] } }
+                    }
+                }
+            ])
+            : [];
+        const ownerMap = new Map(owners.map((owner) => [owner._id.toString(), owner]));
+
         const visible = [];
         for (const spark of sparks) {
-            const owner = spark.user;
+            const ownerId = spark.user?.toString();
+            const owner = ownerId ? ownerMap.get(ownerId) : null;
             if (!owner || owner.isDeactivated) continue;
-            const followers = Array.isArray(owner.followers) ? owner.followers : [];
-            const canView = !owner.isPrivate || owner._id.toString() === viewerId || followers.some((id) => id.toString() === viewerId);
-            if (!canView) continue;
 
-            const data = { ...spark, user: { ...owner } };
+            const isSelf = ownerId === viewerId;
+            const isFollowing = followingIds.has(ownerId);
+            if (owner.isPrivate && !isSelf && !isFollowing) continue;
+
+            const likes = Array.isArray(spark.likes) ? spark.likes : [];
+            const saves = Array.isArray(spark.saves) ? spark.saves : [];
+            const comments = Array.isArray(spark.comments) ? spark.comments : [];
+            const data = {
+                ...spark,
+                user: {
+                    _id: owner._id,
+                    name: owner.name || "",
+                    username: owner.username || "",
+                    profileImage: owner.profileImage || "",
+                    verified: owner.verified === true
+                },
+                likes: likes.length,
+                comments: comments.length,
+                saves: saves.length,
+                liked: likes.some((id) => id.toString() === viewerId),
+                saved: saves.some((id) => id.toString() === viewerId),
+                isFollowing,
+                creatorFollowerCount: Number(owner.followerCount || 0)
+            };
+
             if (data.audio?.streamUrl) data.audio.streamUrl = absoluteMediaUrl(req, data.audio.streamUrl);
-            data.creatorFollowerCount = followers.length;
-            data.isFollowing = followers.some((id) => id.toString() === viewerId);
-            data.liked = (spark.likes || []).some((id) => id.toString() === viewerId);
-            data.saved = (spark.saves || []).some((id) => id.toString() === viewerId);
-            delete data.viewedBy;
-            delete data.user.followers;
             visible.push(data);
             if (visible.length >= limit) break;
         }

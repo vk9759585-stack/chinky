@@ -264,80 +264,97 @@ exports.getFlow = async (req, res) => {
         res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
         res.set("Pragma", "no-cache");
         res.set("Expires", "0");
-        const limit = Math.min(Math.max(Number(req.query.limit) || 30, 10), 50);
-        const viewerId =
-            req.user.id ||
-            req.user._id ||
-            req.user.userId;
 
-        const posts = await Post.find({
+        const limit = Math.min(Math.max(Number(req.query.limit) || 30, 10), 50);
+        const viewerId = String(req.user.id || req.user._id || req.user.userId || "");
+        const before = req.query.before ? new Date(req.query.before) : null;
+
+        // Read the viewer's following list once. The old implementation populated
+        // every creator's full followers array for every feed request, which gets
+        // increasingly expensive as accounts grow.
+        const viewer = await User.findById(viewerId).select("following").lean();
+        const followingIds = new Set((viewer?.following || []).map((id) => id.toString()));
+
+        const filter = {
+            ...(before && !Number.isNaN(before.getTime()) ? { createdAt: { $lt: before } } : {}),
             $or: [
                 { moderationStatus: { $exists: false } },
                 { moderationStatus: "approved" },
                 { moderationStatus: "pending", user: viewerId }
             ]
-        })
-            .populate(
-                "user",
-                "name username profileImage verified isPrivate isDeactivated followers"
-            )
-            .sort({
-                createdAt: -1
-            })
-            // Over-fetch because private posts may be removed below.
-            .limit(limit * 2);
+        };
 
-        const visiblePosts = posts.filter((post) => {
-            const owner = post.user;
+        // Keep a small over-fetch only for private/deactivated-account filtering.
+        // Exclude viewedBy because the client never needs the potentially large array.
+        const posts = await Post.find(filter)
+            .select("-viewedBy")
+            .sort({ createdAt: -1 })
+            .limit(limit * 2)
+            .lean();
 
-            if (!owner || owner.isDeactivated) return false;
+        const ownerIds = [...new Set(posts.map((post) => post.user?.toString()).filter(Boolean))];
+        const owners = ownerIds.length
+            ? await User.aggregate([
+                { $match: { _id: { $in: ownerIds.map((id) => new (require("mongoose").Types.ObjectId)(id)) } } },
+                {
+                    $project: {
+                        name: 1,
+                        username: 1,
+                        profileImage: 1,
+                        verified: 1,
+                        isPrivate: 1,
+                        isDeactivated: 1,
+                        followerCount: { $size: { $ifNull: ["$followers", []] } }
+                    }
+                }
+            ])
+            : [];
+        const ownerMap = new Map(owners.map((owner) => [owner._id.toString(), owner]));
 
-            if (!owner.isPrivate) {
-                return true;
-            }
+        const flow = [];
+        for (const post of posts) {
+            const ownerId = post.user?.toString();
+            const owner = ownerId ? ownerMap.get(ownerId) : null;
+            if (!owner || owner.isDeactivated) continue;
 
-            const ownerId = owner._id.toString();
+            const isSelf = ownerId === viewerId;
+            const isFollowing = followingIds.has(ownerId);
+            if (owner.isPrivate && !isSelf && !isFollowing) continue;
 
-            return (
-                ownerId === viewerId?.toString() ||
-                owner.followers.some(
-                    (id) => id.toString() === viewerId?.toString()
-                )
-            );
-        });
+            const likes = Array.isArray(post.likes) ? post.likes : [];
+            const saves = Array.isArray(post.saves) ? post.saves : [];
+            const comments = Array.isArray(post.comments) ? post.comments : [];
 
-        const flow = visiblePosts.slice(0, limit).map((post) => {
-            const data = post.toObject();
-            const ownerFollowers = post.user?.followers || [];
-            if (data.user?.followers) delete data.user.followers;
-            delete data.viewedBy;
-            return {
-                ...data,
-                liked: post.likes.some(
-                    (id) => id.toString() === viewerId?.toString()
-                ),
-                saved: post.saves.some(
-                    (id) => id.toString() === viewerId?.toString()
-                ),
-                isFollowing: ownerFollowers.some(
-                    (id) => id.toString() === viewerId?.toString()
-                ),
-                creatorFollowerCount: ownerFollowers.length
-            };
-        });
+            flow.push({
+                ...post,
+                user: {
+                    _id: owner._id,
+                    name: owner.name || "",
+                    username: owner.username || "",
+                    profileImage: owner.profileImage || "",
+                    verified: owner.verified === true
+                },
+                likes: likes.length,
+                comments: comments.length,
+                saves: saves.length,
+                liked: likes.some((id) => id.toString() === viewerId),
+                saved: saves.some((id) => id.toString() === viewerId),
+                isFollowing,
+                creatorFollowerCount: Number(owner.followerCount || 0)
+            });
+
+            if (flow.length >= limit) break;
+        }
 
         return res.status(200).json({
             success: true,
             count: flow.length,
-            data: flow
+            data: flow,
+            nextCursor: flow.length ? flow[flow.length - 1].createdAt : null
         });
 
     } catch (err) {
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
 
