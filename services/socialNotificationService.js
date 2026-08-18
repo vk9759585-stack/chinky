@@ -55,7 +55,7 @@ async function createSocialNotification(req, payload) {
   try {
     const user = await User.findById(receiver).select("+fcmTokens appSettings").lean();
     const tokens = Array.isArray(user?.fcmTokens) ? user.fcmTokens : [];
-    if (tokens.length && allowsPush(user, payload.type || "mention")) {
+    if (payload.push !== false && tokens.length && allowsPush(user, payload.type || "mention")) {
       const actor = populated?.sender;
       const actorName = actor?.username
         ? `@${actor.username}`

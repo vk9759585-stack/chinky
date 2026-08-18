@@ -1,6 +1,7 @@
 const Call = require("../models/Call");
 const User = require("../models/User");
 const { sendNotification } = require("../services/notificationService");
+const { createSocialNotification } = require("../services/socialNotificationService");
 
 // ======================================
 // START CALL
@@ -91,6 +92,19 @@ exports.startCall = async (req, res) => {
             caller?.username || caller?.name || "CHINKY user"
         );
         const callerImage = String(caller?.profileImage || "");
+        // Keep the call visible in Activity/realtime notifications too.
+        // Push is disabled here because the dedicated incoming_call push below
+        // carries the callId and opens the actual call screen.
+        createSocialNotification(req, {
+            sender: req.user.id,
+            receiver: receiverId,
+            type: "call",
+            title: req.body.type === "video" ? "Incoming video call" : "Incoming voice call",
+            body: `${callerName} is calling you`,
+            link: `/call/${call._id}`,
+            push: false
+        }).catch(() => {});
+
         if (receiver?.fcmTokens?.length) {
             sendNotification(
                 receiver.fcmTokens,
