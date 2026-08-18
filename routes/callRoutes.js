@@ -13,6 +13,12 @@ router.post(
     controller.startCall
 );
 
+router.put(
+    "/ringing/:id",
+    auth,
+    controller.markRinging
+);
+
 // ===================================
 // ACCEPT CALL
 // ===================================

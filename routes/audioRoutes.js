@@ -6,6 +6,7 @@ router.get("/", auth, controller.list);
 router.get("/:id", auth, controller.getOne);
 router.post("/from-spark/:sparkId", auth, controller.ensureFromSpark);
 router.put("/:id/save", auth, controller.setSaved);
+router.get("/:id/sparks", auth, controller.sparksByAudio);
 router.post("/:id/use", auth, controller.recordUse);
 
 module.exports = router;

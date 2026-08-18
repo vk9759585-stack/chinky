@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Gift = require('../models/Gift');
 const Notification = require('../models/Notification');
 const LiveBattle = require('../models/LiveBattle');
+const Call = require('../models/Call');
 const { getGift } = require('../config/monetization');
 const { changeCoins, creditCreatorGiftEarnings, runFinancialTransaction } = require('../services/walletAccountingService');
 const { createSocialNotification } = require("../services/socialNotificationService");
@@ -52,6 +53,22 @@ exports.createZegoToken = async (req, res) => {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(liveID)) return res.status(400).json({ success: false, message: "Invalid live room ID." });
   if (![16, 24, 32].includes(Buffer.byteLength(serverSecret))) return res.status(500).json({ success: false, message: "Invalid ZEGOCLOUD server secret." });
   try {
+    // A 24-char Mongo ObjectId is used as the room ID for one-to-one calls.
+    // Do not issue an RTC token to arbitrary users or before the receiver has
+    // actually accepted the call. Live rooms use the chinky_* IDs and keep
+    // their existing behavior.
+    if (/^[a-fA-F0-9]{24}$/.test(liveID)) {
+      const call = await Call.findById(liveID).select('caller receiver status').lean();
+      if (!call) return res.status(404).json({ success: false, message: 'Call not found.' });
+      const me = String(req.user.id);
+      if (String(call.caller) !== me && String(call.receiver) !== me) {
+        return res.status(403).json({ success: false, message: 'You are not a participant in this call.' });
+      }
+      if (call.status !== 'accepted') {
+        return res.status(409).json({ success: false, message: 'Call has not been accepted yet.' });
+      }
+    }
+
     const userID = String(req.user.id).replace(/[^A-Za-z0-9_]/g, "_");
     const user = await User.findById(req.user.id).select('name username');
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });

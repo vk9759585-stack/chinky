@@ -163,6 +163,25 @@ exports.setSaved = async (req, res) => {
   }
 };
 
+exports.sparksByAudio = async (req, res) => {
+  try {
+    const audio = await Audio.findById(req.params.id).select("_id reusable blocked").lean();
+    if (!audio || audio.blocked || !audio.reusable) {
+      return res.status(404).json({ success: false, message: "Audio not available" });
+    }
+    const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 60);
+    const sparks = await Spark.find({ audio: audio._id })
+      .populate("user", "username profileImage")
+      .populate("audio", "title artistName streamUrl duration coverUrl owner usageCount")
+      .sort({ views: -1, createdAt: -1 })
+      .limit(limit)
+      .lean();
+    return res.json({ success: true, count: sparks.length, data: sparks });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.recordUse = async (req, res) => {
   try {
     const audio = await Audio.findOneAndUpdate(

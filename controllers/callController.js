@@ -70,9 +70,10 @@ exports.startCall = async (req, res) => {
             createdAt: new Date()
         });
 
-        call.status = "ringing";
-        await call.save();
-
+        // Keep the caller in "Calling" until the receiver device/app
+        // confirms that the incoming-call screen has actually been reached.
+        // This prevents a fake ringback tone when the other device never got
+        // the invitation.
         const io = req.app.get("io");
         const incoming = await Call.findById(call._id)
             .populate("caller", "name username profileImage");
@@ -135,6 +136,34 @@ exports.startCall = async (req, res) => {
             success: false,
             message: err.message
         });
+    }
+};
+
+
+// ======================================
+// RECEIVER CONFIRMED RINGING
+// ======================================
+exports.markRinging = async (req, res) => {
+    try {
+        const call = await Call.findOneAndUpdate(
+            { _id: req.params.id, receiver: req.user.id, status: "calling" },
+            { status: "ringing" },
+            { new: true }
+        );
+        if (!call) {
+            const existing = await Call.findOne({
+                _id: req.params.id,
+                receiver: req.user.id,
+                status: { $in: ["ringing", "accepted"] }
+            });
+            if (existing) return res.json({ success: true, data: existing });
+            return res.status(404).json({ success: false, message: "Call not found" });
+        }
+        const io = req.app.get("io");
+        if (io) io.to(`user:${call.caller}`).emit("call:ringing", call.toObject());
+        return res.json({ success: true, data: call });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
 
