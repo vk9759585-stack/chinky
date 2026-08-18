@@ -1,7 +1,12 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 
 const User = require("../models/User");
+const LoginHistory = require("../models/LoginHistory");
+const LoginSession = require("../models/LoginSession");
+const SecurityEmailLog = require("../models/SecurityEmailLog");
+const { sendSecurityEmail } = require("../services/emailService");
 
 const normalizeIdentifier = (value) => String(value || "").trim();
 const normalizeUsername = (value) => normalizeIdentifier(value).toLowerCase();
@@ -18,14 +23,78 @@ const publicUser = (user) => {
     return data;
 };
 
-const issueToken = (userId) => {
+const tokenHash = (token) =>
+    crypto.createHash("sha256").update(String(token || "")).digest("hex");
+
+const issueToken = (userId, sessionId) => {
     const secret = String(process.env.JWT_SECRET || "").trim();
     if (!secret) {
         const error = new Error("Server authentication is not configured");
         error.code = "JWT_SECRET_MISSING";
         throw error;
     }
-    return jwt.sign({ id: userId }, secret, { expiresIn: "30d" });
+    return jwt.sign(
+        { id: userId, sid: sessionId },
+        secret,
+        { expiresIn: "30d" }
+    );
+};
+
+const clientIp = (req) =>
+    String(req.headers["x-forwarded-for"] || req.ip || "")
+        .split(",")[0]
+        .trim();
+
+const deviceMeta = (req) => ({
+    deviceId: String(req.body.deviceId || "").trim().slice(0, 160),
+    deviceName: String(req.body.deviceName || "Unknown device").trim().slice(0, 120),
+    operatingSystem: String(req.body.operatingSystem || "").trim().slice(0, 120),
+    browser: String(req.body.browser || "").trim().slice(0, 120),
+    ipAddress: clientIp(req),
+});
+
+const createSession = async (req, user, loginMethod) => {
+    const sessionId = crypto.randomBytes(24).toString("hex");
+    const token = issueToken(user._id, sessionId);
+    const meta = deviceMeta(req);
+    await LoginSession.create({
+        user: user._id,
+        sessionId,
+        tokenHash: tokenHash(token),
+        ...meta,
+        loginMethod,
+        lastActiveAt: new Date(),
+    });
+    await LoginHistory.create({
+        user: user._id,
+        ipAddress: meta.ipAddress,
+        device: meta.deviceName,
+        browser: meta.browser,
+        operatingSystem: meta.operatingSystem,
+        location: "",
+        loginMethod: ["email", "phone", "username"].includes(loginMethod)
+            ? loginMethod
+            : "email",
+        status: "success",
+    }).catch(() => {});
+    return token;
+};
+
+const recordSecurityEmail = async (user, subject, message, type) => {
+    let status = "recorded";
+    try {
+        await sendSecurityEmail(user.email, subject, message);
+        status = "sent";
+    } catch (_) {
+        status = "failed";
+    }
+    await SecurityEmailLog.create({
+        user: user._id,
+        recipient: user.email,
+        subject,
+        type,
+        status,
+    }).catch(() => {});
 };
 
 // =====================================
@@ -61,7 +130,13 @@ exports.register = async (req, res) => {
 
         // Registration now creates a valid authenticated session immediately.
         // This prevents a freshly-created account from reaching Home without a token.
-        const token = issueToken(user._id);
+        const token = await createSession(req, user, "email");
+        void recordSecurityEmail(
+            user,
+            "New CHINKY account sign-in",
+            `Your CHINKY account was signed in on ${String(req.body.deviceName || "a new device")}.`,
+            "login"
+        );
 
         return res.status(201).json({
             success: true,
@@ -134,6 +209,16 @@ exports.login = async (req, res) => {
         }
 
         if (!matchedPassword) {
+            await LoginHistory.create({
+                user: user._id,
+                ipAddress: clientIp(req),
+                device: String(req.body.deviceName || "Unknown device"),
+                browser: String(req.body.browser || ""),
+                operatingSystem: String(req.body.operatingSystem || ""),
+                location: "",
+                loginMethod: rawLogin.includes("@") ? "email" : "username",
+                status: "failed",
+            }).catch(() => {});
             return res.status(401).json({ success: false, message: "Invalid password" });
         }
 
@@ -145,7 +230,16 @@ exports.login = async (req, res) => {
         user.lastLoginAt = new Date();
         await user.save();
 
-        const token = issueToken(user._id);
+        const loginMethod = rawLogin.includes("@")
+            ? "email"
+            : (/^[+\d]/.test(rawLogin) ? "phone" : "username");
+        const token = await createSession(req, user, loginMethod);
+        void recordSecurityEmail(
+            user,
+            "New login to your CHINKY account",
+            `A login was detected on ${String(req.body.deviceName || "a device")}.`,
+            "login"
+        );
 
         return res.status(200).json({
             success: true,

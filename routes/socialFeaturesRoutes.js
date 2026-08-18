@@ -1,1 +1,12 @@
-const r=require("express").Router(),a=require("../middleware/authMiddleware"),c=require("../controllers/socialFeaturesController");r.get("/profile-qr",a,c.profileQr);r.get("/local-trending",a,c.localTrending);r.post("/:type",a,c.create);r.get("/:type",a,c.list);r.delete("/item/:id",a,c.remove);module.exports=r;
+const router = require("express").Router();
+const auth = require("../middleware/authMiddleware");
+const controller = require("../controllers/socialFeaturesController");
+
+// Real, purpose-specific social tools only.
+router.get("/profile-code", auth, controller.profileQr);
+
+router.get("/close-friends", auth, controller.closeFriends);
+router.post("/close-friends", auth, controller.addCloseFriend);
+router.delete("/close-friends/:id", auth, controller.removeCloseFriend);
+
+module.exports = router;

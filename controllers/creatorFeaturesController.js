@@ -4,6 +4,7 @@ const Spark = require("../models/Spark");
 const LiveSession = require("../models/LiveSession");
 const Gift = require("../models/Gift");
 const Follow = require("../models/Follow");
+const User = require("../models/User");
 const Wallet = require("../models/Wallet");
 const ScheduledLive = require("../models/ScheduledLive");
 const LiveBattle = require("../models/LiveBattle");
@@ -24,33 +25,93 @@ async function profile(userId) {
 exports.analytics = async (req, res) => {
   try {
     const userId = req.user.id;
-    const [postCount, sparkCount, lives, followers, wallet, gifts, p] = await Promise.all([
+    const objectId = new mongoose.Types.ObjectId(userId);
+
+    const [
+      postCount,
+      sparkCount,
+      lives,
+      user,
+      wallet,
+      gifts,
+      postViews,
+      sparkViews,
+    ] = await Promise.all([
       Post.countDocuments({ user: userId, isArchived: { $ne: true } }),
-      Spark.countDocuments({ user: userId }),
+      Spark.countDocuments({
+        user: userId,
+        $or: [
+          { publishStatus: { $exists: false } },
+          { publishStatus: "ready" },
+        ],
+      }),
       LiveSession.countDocuments({ hostUserId: userId }),
-      Follow.countDocuments({ following: userId }),
+      User.findById(userId).select("followers").lean(),
       Wallet.findOne({ user: userId }).lean(),
       Gift.aggregate([
-        { $match: { receiver: new mongoose.Types.ObjectId(userId), status: "completed" } },
-        { $group: { _id: null, count: { $sum: 1 }, coins: { $sum: "$coins" } } }
+        {
+          $match: {
+            receiver: objectId,
+            status: "completed",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            mints: { $sum: "$coins" },
+            creatorCoinMinor: { $sum: "$creatorCoinMinor" },
+          },
+        },
       ]),
-      profile(userId)
+      Post.aggregate([
+        { $match: { user: objectId, isArchived: { $ne: true } } },
+        { $group: { _id: null, views: { $sum: "$views" } } },
+      ]),
+      Spark.aggregate([
+        {
+          $match: {
+            user: objectId,
+            $or: [
+              { publishStatus: { $exists: false } },
+              { publishStatus: "ready" },
+            ],
+          },
+        },
+        { $group: { _id: null, views: { $sum: "$views" } } },
+      ]),
     ]);
-    const [postViews, sparkViews] = await Promise.all([
-      Post.aggregate([{ $match: { user: new mongoose.Types.ObjectId(userId) } }, { $group: { _id: null, views: { $sum: "$views" } } }]),
-      Spark.aggregate([{ $match: { user: new mongoose.Types.ObjectId(userId) } }, { $group: { _id: null, views: { $sum: "$views" } } }])
-    ]);
-    const views = (postViews[0]?.views || 0) + (sparkViews[0]?.views || 0);
-    const xp = Math.max(p.xp || 0, Math.floor(views / 10) + followers * 5 + (gifts[0]?.count || 0) * 3);
-    const level = Math.max(1, Math.floor(Math.sqrt(xp / 100)) + 1);
-    if (xp !== p.xp || level !== p.level) { p.xp = xp; p.level = level; await p.save(); }
-    res.json({ success: true, data: {
-      posts: postCount, sparks: sparkCount, lives, followers, views,
-      gifts: gifts[0]?.count || 0, giftCoins: gifts[0]?.coins || 0,
-      earningsPaise: wallet?.availableEarningsPaise || 0,
-      level, xp, nextLevelXp: level * level * 100
-    }});
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+
+    const followers = Array.isArray(user?.followers)
+      ? user.followers.length
+      : 0;
+    const views =
+      Number(postViews[0]?.views || 0) +
+      Number(sparkViews[0]?.views || 0);
+
+    const earnedCoinMinor = Math.max(
+      0,
+      Number(wallet?.earnedCoinMinor || 0)
+    );
+    const earningsPaise = Math.round(earnedCoinMinor / 2);
+
+    return res.json({
+      success: true,
+      data: {
+        posts: postCount,
+        sparks: sparkCount,
+        lives,
+        followers,
+        views,
+        gifts: Number(gifts[0]?.count || 0),
+        giftMints: Number(gifts[0]?.mints || 0),
+        creatorCoinMinor: earnedCoinMinor,
+        earningsPaise,
+      },
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
 };
 
 exports.scheduleLive = async (req, res) => {

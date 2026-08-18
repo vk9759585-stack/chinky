@@ -142,6 +142,12 @@ const userSchema = new mongoose.Schema(
             default: null
         },
 
+        passwordChangedAt: {
+            type: Date,
+            default: null
+        },
+
+
         // Firebase is used only for push delivery. App data remains in MongoDB.
         fcmTokens: {
             type: [String],

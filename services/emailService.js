@@ -42,3 +42,21 @@ exports.sendOtp = async (email, otp) => {
     throw new Error("Failed to send OTP");
   }
 };
+
+exports.sendSecurityEmail = async (email, subject, message) => {
+  if (!process.env.EMAIL || !process.env.EMAIL_PASSWORD) {
+    throw new Error("Email service is not configured");
+  }
+  await transporter.sendMail({
+    from: `"CHINKY Security" <${process.env.EMAIL}>`,
+    to: email,
+    subject,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.55;color:#1d1d1f">
+        <h2 style="margin-bottom:12px">CHINKY Security</h2>
+        <p>${String(message || "").replace(/[<>&]/g, "")}</p>
+        <p style="color:#666;font-size:13px">If this was not you, open CHINKY → Password and security → Where you're logged in.</p>
+      </div>
+    `,
+  });
+};
