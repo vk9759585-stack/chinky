@@ -63,6 +63,12 @@ const callSchema = new mongoose.Schema(
     }
 );
 
+
+callSchema.index({ caller: 1, receiver: 1, createdAt: -1 });
+callSchema.index({ receiver: 1, caller: 1, createdAt: -1 });
+callSchema.index({ caller: 1, status: 1, createdAt: -1 });
+callSchema.index({ receiver: 1, status: 1, createdAt: -1 });
+
 module.exports = mongoose.model(
     "Call",
     callSchema

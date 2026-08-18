@@ -324,20 +324,33 @@ exports.getCallHistory = async (req, res) => {
             { receiver: req.user.id, status: { $in: ["calling", "ringing"] }, createdAt: { $lt: missedBefore } },
             { $set: { status: "missed", endedAt: new Date() } }
         );
-        const calls = await Call.find({
-            $or: [
-                { caller: req.user.id },
-                { receiver: req.user.id }
-            ]
-        })
-            .populate("caller", "username name profilePic")
-            .populate("receiver", "username name profilePic")
-            .sort({ createdAt: -1 });
+        const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 100);
+        const peer = String(req.query.peer || "").trim();
+        const membership = peer
+            ? {
+                $or: [
+                    { caller: req.user.id, receiver: peer },
+                    { caller: peer, receiver: req.user.id }
+                ]
+            }
+            : {
+                $or: [
+                    { caller: req.user.id },
+                    { receiver: req.user.id }
+                ]
+            };
+
+        const calls = await Call.find(membership)
+            .populate("caller", "username name profilePic profileImage")
+            .populate("receiver", "username name profilePic profileImage")
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .lean();
 
         return res.json({
             success: true,
             data: calls.map((call) => ({
-                ...call.toObject(),
+                ...call,
                 isCaller: String(call.caller?._id || call.caller) === String(req.user.id),
                 otherUser: String(call.caller?._id || call.caller) === String(req.user.id) ? call.receiver : call.caller
             }))
