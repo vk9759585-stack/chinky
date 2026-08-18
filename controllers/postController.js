@@ -273,7 +273,8 @@ exports.getFlow = async (req, res) => {
         const posts = await Post.find({
             $or: [
                 { moderationStatus: { $exists: false } },
-                { moderationStatus: "approved" }
+                { moderationStatus: "approved" },
+                { moderationStatus: "pending", user: viewerId }
             ]
         })
             .populate(

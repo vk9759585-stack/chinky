@@ -446,7 +446,8 @@ exports.getSparks = async (req, res) => {
                 {
                     $or: [
                         { moderationStatus: { $exists: false } },
-                        { moderationStatus: "approved" }
+                        { moderationStatus: "approved" },
+                        { moderationStatus: "pending", user: viewerId }
                     ]
                 }
             ]

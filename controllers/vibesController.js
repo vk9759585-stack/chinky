@@ -103,7 +103,8 @@ exports.getVibes = async (req, res) => {
             expiresAt: { $gt: new Date() },
             $or: [
                 { moderationStatus: { $exists: false } },
-                { moderationStatus: "approved" }
+                { moderationStatus: "approved" },
+                { moderationStatus: "pending", user: viewerId }
             ]
         })
             .populate("user", "name username profileImage verified isPrivate isDeactivated followers")
