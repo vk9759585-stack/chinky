@@ -14,36 +14,30 @@ const razorpaySecret = String(
     process.env.RAZORPAY_KEY_SECRET ||
     ''
 ).trim();
-const isLiveRazorpay = Boolean(
+const isLiveMode = razorpayKeyId.startsWith('rzp_live_');
+const isRazorpayConfigured = Boolean(
     razorpay &&
-    razorpayKeyId.startsWith('rzp_live_') &&
+    (razorpayKeyId.startsWith('rzp_live_') || razorpayKeyId.startsWith('rzp_test_')) &&
     razorpaySecret
 );
-
-const livePaymentUnavailable = (res) => {
-    return res.status(503).json({
-        success: false,
-        code: 'LIVE_PAYMENT_NOT_CONFIGURED',
-        message: 'Live Razorpay payments are not configured. Add Live Mode Razorpay keys before selling Mints.',
-    });
-};
 
 const paymentUnavailable = (res) => {
     return res.status(503).json({
         success: false,
-        message: 'Payments are currently unavailable on this server.',
+        code: 'PAYMENT_NOT_CONFIGURED',
+        message: 'Razorpay payment is not configured on the server. Please configure RAZORPAY_KEY and RAZORPAY_SECRET in backend/.env.',
     });
 };
 
 exports.getCoinCheckoutConfig = (_, res) => res.json({
     success: true,
-    key: isLiveRazorpay ? razorpayKeyId : null,
-    enabled: isLiveRazorpay,
-    liveMode: isLiveRazorpay,
-    paymentMode: isLiveRazorpay ? 'live' : 'disabled',
-    upiEnabled: isLiveRazorpay,
-    cardsEnabled: isLiveRazorpay,
-    netbankingEnabled: isLiveRazorpay,
+    key: isRazorpayConfigured ? razorpayKeyId : null,
+    enabled: isRazorpayConfigured,
+    liveMode: isLiveMode,
+    paymentMode: isRazorpayConfigured ? (isLiveMode ? 'live' : 'test') : 'disabled',
+    upiEnabled: isRazorpayConfigured,
+    cardsEnabled: isRazorpayConfigured,
+    netbankingEnabled: isRazorpayConfigured,
     customCoinMin: CUSTOM_COIN_MIN,
     customCoinMax: CUSTOM_COIN_MAX,
     purchaseCoinsPer10Rupees: require('../config/monetization').PURCHASE_COINS_PER_10_RUPEES,
@@ -57,7 +51,7 @@ exports.quoteCustomCoinPurchase = (req, res) => {
 };
 
 exports.createCoinOrder = async (req, res) => {
-    if (!isLiveRazorpay) return livePaymentUnavailable(res);
+    if (!isRazorpayConfigured) return paymentUnavailable(res);
     try {
         const requestedPackageId = String(req.body.packageId || '');
         const customCoins = req.body.customCoins;
@@ -84,7 +78,7 @@ exports.createCoinOrder = async (req, res) => {
             purpose: 'coins',
             packageId: coinPackage.id,
             coins: coinPackage.coins,
-                mints: coinPackage.mints ?? coinPackage.coins,
+            mints: coinPackage.mints ?? coinPackage.coins,
             description: `Chinky Coins: ${coinPackage.id}`,
         });
         return res.status(201).json({
@@ -98,7 +92,7 @@ exports.createCoinOrder = async (req, res) => {
                 packageId: coinPackage.id,
                 coins: coinPackage.coins,
                 mints: coinPackage.mints ?? coinPackage.coins,
-                liveMode: true,
+                liveMode: isLiveMode,
             },
         });
     } catch (err) {
@@ -108,7 +102,7 @@ exports.createCoinOrder = async (req, res) => {
 
 exports.verifyCoinPayment = async (req, res) => {
     const secret = razorpaySecret;
-    if (!isLiveRazorpay) return livePaymentUnavailable(res);
+    if (!isRazorpayConfigured) return paymentUnavailable(res);
 
     const { orderId, paymentId, signature } = req.body;
     if (![orderId, paymentId, signature].every((value) => typeof value === 'string' && value.trim())) {

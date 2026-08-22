@@ -86,6 +86,7 @@ exports.startCall = async (req, res) => {
         // only after the receiver accepts.
         const receiver = await User.findById(receiverId)
             .select("fcmTokens")
+            .select("+fcmTokens")
             .lean()
             .catch(() => null);
         const caller = incoming?.caller;
@@ -187,7 +188,10 @@ exports.acceptCall = async (req, res) => {
         }
 
         const io = req.app.get("io");
-        if (io) io.to(`user:${call.caller}`).emit("call:accepted", call.toObject());
+        if (io) {
+            io.to(`user:${call.caller}`).emit("call:accepted", call.toObject());
+            io.to(`user:${call.receiver}`).emit("call:accepted", call.toObject());
+        }
 
         return res.json({
             success: true,
@@ -214,7 +218,11 @@ exports.rejectCall = async (req, res) => {
         );
 
         const io = req.app.get("io");
-        if (io && call) io.to(`user:${call.caller}`).emit("call:rejected", call.toObject());
+        if (io && call) {
+            io.to(`user:${call.caller}`).emit("call:rejected", call.toObject());
+            io.to(`user:${call.caller}`).emit("call:ended", call.toObject());
+            io.to(`user:${call.receiver}`).emit("call:ended", call.toObject());
+        }
 
         return res.json({
             success: true,

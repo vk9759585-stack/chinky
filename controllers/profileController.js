@@ -148,9 +148,17 @@ exports.updateProfile = async (req, res) => {
         if (name) updates.name = name.trim();
 
         if (username) {
-            updates.username = username
+            const normalizedUsername = username
                 .trim()
                 .toLowerCase();
+            const usernameOwner = await User.findOne({
+                username: normalizedUsername,
+                _id: { $ne: req.user.id }
+            }).select("_id").lean();
+            if (usernameOwner) {
+                return res.status(409).json({ success: false, message: "Username is already taken" });
+            }
+            updates.username = normalizedUsername;
         }
 
         if (typeof bio === "string") updates.bio = bio.trim();

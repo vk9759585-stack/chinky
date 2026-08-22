@@ -34,6 +34,11 @@ exports.sendNotification = async (tokens, title, body, data = {}, options = {}) 
         body: String(body || "New activity"),
       },
       data: stringData(data),
+      data: stringData({
+        ...data,
+        title: String(title || "CHINKY"),
+        body: String(body || "New activity"),
+      }),
       android: {
         priority: "high",
         ttl: Number.isFinite(Number(options.ttlMs))
@@ -44,11 +49,18 @@ exports.sendNotification = async (tokens, title, body, data = {}, options = {}) 
           sound: options.sound === false ? undefined : "default",
           priority: "max",
           visibility: "public",
+          icon: "@mipmap/ic_launcher",
+          defaultSound: true,
+          defaultVibrateTimings: true,
         },
       },
       apns: {
         payload: {
           aps: {
+            alert: {
+              title: String(title || "CHINKY"),
+              body: String(body || "New activity"),
+            },
             sound: options.sound === false ? undefined : "default",
             badge: 1,
           },

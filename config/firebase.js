@@ -5,6 +5,9 @@ const {
   initializeApp,
 } = require("firebase-admin/app");
 
+const path = require("path");
+const fs = require("fs");
+
 function normalizedPrivateKey(value) {
   return String(value || "").replace(/\\n/g, "\n");
 }
@@ -16,7 +19,29 @@ function serviceAccountFromEnv() {
       return JSON.parse(raw);
     } catch (error) {
       console.error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON:", error.message);
-      return null;
+    }
+  }
+
+  const filePath = String(process.env.FIREBASE_SERVICE_ACCOUNT_PATH || "").trim();
+  if (filePath && fs.existsSync(filePath)) {
+    try {
+      return JSON.parse(fs.readFileSync(filePath, "utf8"));
+    } catch (error) {
+      console.error("Invalid FIREBASE_SERVICE_ACCOUNT_PATH file:", error.message);
+    }
+  }
+
+  const candidates = [
+    path.join(__dirname, "..", "firebase-service-account.json"),
+    path.join(__dirname, "..", "serviceAccountKey.json"),
+    path.join(__dirname, "..", "firebase-admin.json"),
+    path.join(__dirname, "..", "..", "firebase-service-account.json"),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      try {
+        return JSON.parse(fs.readFileSync(candidate, "utf8"));
+      } catch (_) {}
     }
   }
 

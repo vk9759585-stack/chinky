@@ -111,12 +111,25 @@ exports.sendMessage = async (req, res) => {
         // Persist + push message activity so the receiver sees it even when
         // the chat screen/app is not open. This is best-effort and never
         // blocks message delivery if notification delivery has a problem.
+        const messagePreview = (message && String(message).trim())
+            ? String(message).trim().slice(0, 120)
+            : (type === "image"
+                ? "📷 Photo"
+                : type === "voice"
+                    ? "🎤 Voice message"
+                    : type === "video"
+                        ? "🎥 Video"
+                        : type === "file"
+                            ? "📎 Attachment"
+                            : "Sent you a message");
+
         createSocialNotification(req, {
             sender: req.user.id,
             receiver: receiverId,
             type: "message",
             title: "New message",
             body: (message || "Sent you a message").toString().slice(0, 120),
+            body: messagePreview,
             link: `/chat/${req.user.id}`
         }).catch(() => {});
 
