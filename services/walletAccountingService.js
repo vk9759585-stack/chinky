@@ -114,12 +114,7 @@ async function changeCoins({ user, delta, transactionType, referenceType, refere
   const before = Number(wallet.coins || 0);
   if (delta < 0) {
     if (before < -delta) throw new Error('Insufficient Mint balance');
-    const purchasedOnly = ['spark_gift_sent', 'live_gift_sent', 'gift_sent'].includes(transactionType);
-    if (purchasedOnly) {
-      debitPurchasedCoins(wallet, -delta);
-    } else {
-      debitBuckets(wallet, -delta);
-    }
+    debitBuckets(wallet, -delta);
     wallet.totalCoinsSpent += -delta;
     wallet.totalSpent += -delta;
   } else if (transactionType === 'coin_purchase') {

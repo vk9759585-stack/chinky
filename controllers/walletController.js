@@ -13,7 +13,7 @@ exports.getWallet = async (req, res) => {
     data.mints = Number(data.coins || 0);
     data.purchasedMints = Number(data.purchasedCoins || 0);
     data.rewardMints = Number(data.rewardCoins || 0);
-    data.giftableMints = Number(data.purchasedCoins || 0);
+    data.giftableMints = Number(data.coins || 0);
     data.earnedCoinMinor = earnedMinor;
     data.earnedCoinsDisplay = (earnedMinor / 100).toFixed(2);
     data.withdrawableCoins = earnedMinor / 100;

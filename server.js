@@ -196,6 +196,7 @@ app.use("/api/settings", require("./routes/settingsRoutes"));
 
 // CREATOR TOOLS: PK, guest, schedules, analytics, drafts and safety
 app.use("/api/features", require("./routes/creatorFeaturesRoutes"));
+app.use("/api/social-features", socialFeaturesRoutes);
 
 // =====================
 // HEALTH CHECK
@@ -502,5 +503,4 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
-app.use("/api/social-features", socialFeaturesRoutes);
 

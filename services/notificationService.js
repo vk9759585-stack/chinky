@@ -33,7 +33,6 @@ exports.sendNotification = async (tokens, title, body, data = {}, options = {}) 
         title: String(title || "CHINKY"),
         body: String(body || "New activity"),
       },
-      data: stringData(data),
       data: stringData({
         ...data,
         title: String(title || "CHINKY"),
